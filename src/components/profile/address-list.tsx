@@ -1,0 +1,130 @@
+"use client";
+
+import { useState } from "react";
+import { Plus, Trash2, MapPin } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { useBuyerAddresses, useCreateAddress, useDeleteAddress } from "@/hooks/use-buyer";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { EmptyState } from "@/components/shared/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
+
+const addressSchema = z.object({
+  label: z.string().min(1, "Nombre requerido"),
+  street: z.string().min(1, "Calle requerida"),
+  city: z.string().min(1, "Ciudad requerida"),
+  state: z.string().optional(),
+  zip: z.string().min(1, "Código postal requerido"),
+  country: z.string().min(1),
+  phone: z.string().optional(),
+});
+
+type AddressFormValues = z.infer<typeof addressSchema>;
+
+export function AddressList() {
+  const { data: addresses, isLoading } = useBuyerAddresses();
+  const createAddress = useCreateAddress();
+  const deleteAddress = useDeleteAddress();
+  const [showForm, setShowForm] = useState(false);
+
+  const form = useForm<AddressFormValues>({
+    resolver: zodResolver(addressSchema),
+    defaultValues: { label: "", street: "", city: "", zip: "", country: "AR" },
+  });
+
+  const onSubmit = async (values: AddressFormValues) => {
+    await createAddress.mutateAsync({ ...values, isDefault: false });
+    form.reset({ country: "AR" });
+    setShowForm(false);
+  };
+
+  if (isLoading) return <Skeleton className="h-32 w-full rounded-xl" />;
+
+  return (
+    <div className="space-y-3">
+      {(!addresses || addresses.length === 0) && !showForm && (
+        <EmptyState
+          icon={MapPin}
+          title="Sin direcciones"
+          description="Agregá una dirección para poder hacer el checkout."
+        />
+      )}
+
+      {addresses?.map((address) => (
+        <div
+          key={address.id}
+          className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-card px-4 py-3"
+        >
+          <div>
+            <p className="text-sm font-semibold">{address.label}</p>
+            <p className="text-xs text-muted-foreground">
+              {address.street}, {address.city}
+              {address.state ? `, ${address.state}` : ""} · CP {address.zip}
+            </p>
+            {address.phone && (
+              <p className="text-xs text-muted-foreground">{address.phone}</p>
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
+            onClick={() => deleteAddress.mutate(address.id)}
+            disabled={deleteAddress.isPending}
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        </div>
+      ))}
+
+      {showForm && (
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="rounded-xl border border-border/60 bg-card p-4 space-y-3"
+        >
+          <p className="text-sm font-semibold">Nueva dirección</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-1">
+              <Label>Nombre (ej: Casa, Trabajo)</Label>
+              <Input placeholder="Casa" {...form.register("label")} />
+            </div>
+            <div className="grid gap-1">
+              <Label>Teléfono</Label>
+              <Input placeholder="+54 9 11 0000-0000" {...form.register("phone")} />
+            </div>
+            <div className="sm:col-span-2 grid gap-1">
+              <Label>Calle y número</Label>
+              <Input placeholder="Av. Corrientes 1234" {...form.register("street")} />
+            </div>
+            <div className="grid gap-1">
+              <Label>Ciudad</Label>
+              <Input placeholder="Buenos Aires" {...form.register("city")} />
+            </div>
+            <div className="grid gap-1">
+              <Label>Código postal</Label>
+              <Input placeholder="1043" {...form.register("zip")} />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button type="submit" size="sm" disabled={createAddress.isPending}>
+              {createAddress.isPending ? "Guardando..." : "Guardar dirección"}
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setShowForm(false)}>
+              Cancelar
+            </Button>
+          </div>
+        </form>
+      )}
+
+      {!showForm && (
+        <Button variant="ghost" className="gap-1.5 text-primary" onClick={() => setShowForm(true)}>
+          <Plus className="size-4" />
+          Agregar nueva dirección
+        </Button>
+      )}
+    </div>
+  );
+}
