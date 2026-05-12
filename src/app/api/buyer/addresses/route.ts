@@ -5,13 +5,14 @@ import { prisma } from "@/lib/prisma";
 import { getOrCreateBuyerProfile } from "@/lib/buyer-service";
 
 const addressSchema = z.object({
-  label: z.string().min(2),
+  alias: z.string().min(2),
   street: z.string().min(2),
+  number: z.string().min(1),
+  apartment: z.string().optional(),
   city: z.string().min(2),
-  state: z.string().optional(),
-  zip: z.string().min(2),
+  province: z.string().min(2),
+  postalCode: z.string().min(2),
   country: z.string().min(2),
-  phone: z.string().optional(),
   isDefault: z.boolean().optional(),
 });
 
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
   const parsed = addressSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: parsed.error.issues.map((item) => item.message).join(", ") },
+      { error: parsed.error.issues.map((i) => i.message).join(", ") },
       { status: 400 },
     );
   }

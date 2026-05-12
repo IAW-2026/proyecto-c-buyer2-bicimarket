@@ -2,17 +2,16 @@ import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateBuyerProfile } from "@/lib/buyer-service";
+import { getOrCreateBuyerProfile, calculateCartTotals } from "@/lib/buyer-service";
 
 const cartItemSchema = z.object({
   productId: z.string().min(1),
-  title: z.string().min(1),
-  description: z.string().min(1),
-  unitPrice: z.number().nonnegative(),
+  sellerProfileId: z.string().min(1),
+  productNameSnapshot: z.string().min(1),
+  unitPriceCents: z.number().int().nonnegative(),
   quantity: z.number().int().positive(),
-  sellerId: z.string().min(1),
-  sellerName: z.string().optional(),
-  imageUrl: z.string().optional(),
+  weightGramsSnapshot: z.number().int().nonnegative(),
+  currency: z.string().optional(),
 });
 
 export async function GET() {
@@ -32,24 +31,11 @@ export async function GET() {
       data: { buyerProfileId: profile.id },
       include: { items: true },
     });
-    return NextResponse.json({
-      ...newCart,
-      total: 0,
-      itemCount: 0,
-    });
+    return NextResponse.json({ ...newCart, totalCents: 0, itemCount: 0 });
   }
 
-  const items = cart.items.map((item) => ({
-    ...item,
-    subtotal: Number((item.unitPrice * item.quantity).toFixed(2)),
-  }));
-
-  const total = Number(
-    items.reduce((sum, item) => sum + item.subtotal, 0).toFixed(2),
-  );
-  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
-
-  return NextResponse.json({ ...cart, items, total, itemCount });
+  const { totalCents, itemCount } = calculateCartTotals(cart.items);
+  return NextResponse.json({ ...cart, totalCents, itemCount });
 }
 
 export async function POST(request: NextRequest) {
@@ -62,7 +48,7 @@ export async function POST(request: NextRequest) {
   const parsed = cartItemSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: parsed.error.issues.map((item) => item.message).join(", ") },
+      { error: parsed.error.issues.map((i) => i.message).join(", ") },
       { status: 400 },
     );
   }
@@ -74,41 +60,31 @@ export async function POST(request: NextRequest) {
     update: {},
   });
 
-  const existingItem = await prisma.cartItem.findFirst({
+  const existing = await prisma.cartItem.findFirst({
     where: { cartId: cart.id, productId: parsed.data.productId },
   });
 
-  if (existingItem) {
+  if (existing) {
     const updated = await prisma.cartItem.update({
-      where: { id: existingItem.id },
+      where: { id: existing.id },
       data: {
-        quantity: existingItem.quantity + parsed.data.quantity,
-        unitPrice: parsed.data.unitPrice,
-        subtotal: Number(
-          (
-            (existingItem.quantity + parsed.data.quantity) *
-            parsed.data.unitPrice
-          ).toFixed(2),
-        ),
+        quantity: existing.quantity + parsed.data.quantity,
+        unitPriceCents: parsed.data.unitPriceCents,
       },
     });
-    return NextResponse.json(updated, { status: 200 });
+    return NextResponse.json(updated);
   }
 
   const item = await prisma.cartItem.create({
     data: {
       cartId: cart.id,
       productId: parsed.data.productId,
-      title: parsed.data.title,
-      description: parsed.data.description,
-      unitPrice: parsed.data.unitPrice,
+      sellerProfileId: parsed.data.sellerProfileId,
+      productNameSnapshot: parsed.data.productNameSnapshot,
+      unitPriceCents: parsed.data.unitPriceCents,
       quantity: parsed.data.quantity,
-      sellerId: parsed.data.sellerId,
-      sellerName: parsed.data.sellerName,
-      imageUrl: parsed.data.imageUrl,
-      subtotal: Number(
-        (parsed.data.unitPrice * parsed.data.quantity).toFixed(2),
-      ),
+      weightGramsSnapshot: parsed.data.weightGramsSnapshot,
+      currency: parsed.data.currency ?? "ARS",
     },
   });
 

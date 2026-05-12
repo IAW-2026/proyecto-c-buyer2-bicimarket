@@ -19,6 +19,7 @@ export async function GET(
     include: {
       items: true,
       sellerGroups: { include: { orderItems: true } },
+      statusHistory: { orderBy: { occurredAt: "asc" } },
     },
   });
 

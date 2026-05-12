@@ -33,7 +33,7 @@ export function LastOrderPreview() {
       <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-card px-4 py-3">
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">{lastOrder.orderNumber}</span>
+            <span className="text-sm font-medium">…{lastOrder.id.slice(-8)}</span>
             <OrderStatusBadge status={lastOrder.status} />
           </div>
           <p className="text-xs text-muted-foreground">
@@ -42,7 +42,7 @@ export function LastOrderPreview() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <PriceDisplay amount={lastOrder.totalAmount} className="font-semibold" />
+          <PriceDisplay amount={lastOrder.totalCents / 100} className="font-semibold" />
           <Link href={`/orders/${lastOrder.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
             Ver detalle
           </Link>

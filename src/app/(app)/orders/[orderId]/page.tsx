@@ -41,16 +41,19 @@ export default function OrderDetailPage({ params }: Props) {
     year: "numeric",
   });
 
+  const shortId = order.id.slice(-8);
+  const addr = order.shippingAddressSnapshot as Record<string, string>;
+
   return (
     <div className="px-6 py-8">
       <nav className="mb-4 flex items-center gap-1.5 text-xs text-muted-foreground">
         <Link href="/orders" className="hover:text-foreground">Mis órdenes</Link>
         <span>›</span>
-        <span className="font-medium text-foreground">{order.orderNumber.slice(-8)}</span>
+        <span className="font-medium text-foreground">{shortId}</span>
       </nav>
 
       <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Orden</div>
-      <h1 className="font-heading mb-1 text-2xl font-bold tracking-tight">{order.orderNumber}</h1>
+      <h1 className="font-heading mb-1 text-2xl font-bold tracking-tight">…{shortId}</h1>
       <div className="mb-6 flex items-center gap-2">
         <OrderStatusBadge status={order.status} />
         <span className="text-xs text-muted-foreground">· {date}</span>
@@ -67,7 +70,7 @@ export default function OrderDetailPage({ params }: Props) {
         <div className="flex-1 space-y-3">
           {order.sellerGroups.map((group) => {
             const groupItems = order.items.filter(
-              (item) => item.orderSellerGroupId === group.id,
+              (item) => item.sellerGroupId === group.id,
             );
             return (
               <SellerGroupSection key={group.id} group={group} items={groupItems} />
@@ -83,27 +86,32 @@ export default function OrderDetailPage({ params }: Props) {
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Subtotal items</span>
-                <PriceDisplay amount={order.totalAmount - order.shippingAmount} />
+                <PriceDisplay amount={order.itemsTotalCents / 100} />
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total envíos</span>
-                <PriceDisplay amount={order.shippingAmount} />
+                <PriceDisplay amount={order.shippingTotalCents / 100} />
               </div>
             </div>
             <div className="border-t border-border/60 pt-2 flex justify-between font-semibold">
               <span>TOTAL</span>
-              <PriceDisplay amount={order.totalAmount} />
+              <PriceDisplay amount={order.totalCents / 100} />
             </div>
           </div>
 
           {/* Shipping address */}
-          {order.shippingAddressId && (
+          {addr && (
             <div className="rounded-xl border border-border/60 bg-card p-4 space-y-2">
               <div className="flex items-center gap-1.5 text-sm font-semibold">
                 <MapPin className="size-4 text-muted-foreground" />
                 Dirección de envío
               </div>
-              <p className="text-xs text-muted-foreground">ID: {order.shippingAddressId}</p>
+              <p className="text-xs text-muted-foreground">
+                {addr.street} {addr.number}{addr.apartment ? `, ${addr.apartment}` : ""}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {addr.city}, {addr.province} {addr.postalCode}
+              </p>
             </div>
           )}
 

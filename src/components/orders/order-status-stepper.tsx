@@ -18,6 +18,7 @@ const STEPS: Step[] = [
 const STATUS_STEP_INDEX: Record<OrderStatus, number> = {
   [OrderStatus.PENDING_PAYMENT]: 0,
   [OrderStatus.PAID]: 1,
+  [OrderStatus.PAYMENT_FAILED]: -1,
   [OrderStatus.PARTIALLY_SHIPPED]: 2,
   [OrderStatus.SHIPPED]: 3,
   [OrderStatus.DELIVERED]: 4,

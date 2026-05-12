@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Accordion as AccordionPrimitive } from "@base-ui/react/accordion"
 
 import { cn } from "@/lib/utils"

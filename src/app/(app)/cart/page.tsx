@@ -26,8 +26,8 @@ export default function CartPage() {
       {!isEmpty && (
         <p className="mb-6 text-xs text-muted-foreground">
           {cart.itemCount} producto{cart.itemCount !== 1 ? "s" : ""} ·{" "}
-          {new Set(cart.items.map((i) => i.sellerId)).size} vendedor
-          {new Set(cart.items.map((i) => i.sellerId)).size !== 1 ? "es" : ""}
+          {new Set(cart.items.map((i) => i.sellerProfileId)).size} vendedor
+          {new Set(cart.items.map((i) => i.sellerProfileId)).size !== 1 ? "es" : ""}
         </p>
       )}
 

@@ -12,9 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const schema = z.object({
-  displayName: z.string().min(2, "Nombre requerido"),
+  fullName: z.string().min(2, "Nombre requerido"),
   phone: z.string().optional(),
-  documentNumber: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -26,15 +25,14 @@ export function ProfileForm() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { displayName: "", phone: "", documentNumber: "" },
+    defaultValues: { fullName: "", phone: "" },
   });
 
   useEffect(() => {
     if (profile) {
       form.reset({
-        displayName: profile.displayName,
+        fullName: profile.fullName,
         phone: profile.phone ?? "",
-        documentNumber: profile.documentNumber ?? "",
       });
     }
   }, [profile, form]);
@@ -62,21 +60,16 @@ export function ProfileForm() {
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2 grid gap-1">
-          <Label htmlFor="displayName">Nombre completo *</Label>
-          <Input id="displayName" {...form.register("displayName")} />
-          {form.formState.errors.displayName && (
-            <p className="text-xs text-destructive">{form.formState.errors.displayName.message}</p>
+          <Label htmlFor="fullName">Nombre completo *</Label>
+          <Input id="fullName" {...form.register("fullName")} />
+          {form.formState.errors.fullName && (
+            <p className="text-xs text-destructive">{form.formState.errors.fullName.message}</p>
           )}
         </div>
 
         <div className="grid gap-1">
           <Label htmlFor="phone">Teléfono</Label>
           <Input id="phone" placeholder="+54 9 11 0000-0000" {...form.register("phone")} />
-        </div>
-
-        <div className="grid gap-1">
-          <Label htmlFor="documentNumber">Número de documento</Label>
-          <Input id="documentNumber" placeholder="00.000.000" {...form.register("documentNumber")} />
         </div>
 
         <div className="sm:col-span-2 flex items-center gap-2">

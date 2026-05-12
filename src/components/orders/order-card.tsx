@@ -26,20 +26,20 @@ export function OrderCard({ order }: OrderCardProps) {
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1.5">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold">{order.orderNumber}</span>
+            <span className="text-sm font-semibold">…{order.id.slice(-8)}</span>
             <OrderStatusBadge status={order.status} />
           </div>
           <p className="text-xs text-muted-foreground">
             {date} · {order.items.length} producto{order.items.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <PriceDisplay amount={order.totalAmount} className="shrink-0 font-bold" />
+        <PriceDisplay amount={order.totalCents / 100} className="shrink-0 font-bold" />
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-1.5">
           {previewItems.map((item) => (
-            <ProductImage key={item.id} src={undefined} alt={item.title} size="sm" />
+            <ProductImage key={item.id} src={undefined} alt={item.productNameSnapshot} size="sm" />
           ))}
           {extraCount > 0 && (
             <span className="flex size-10 items-center justify-center rounded-md bg-muted text-xs text-muted-foreground">
@@ -47,7 +47,7 @@ export function OrderCard({ order }: OrderCardProps) {
             </span>
           )}
           <p className="ml-1 text-xs text-muted-foreground">
-            {previewItems.map((i) => i.title).join(" · ")}
+            {previewItems.map((i) => i.productNameSnapshot).join(" · ")}
             {extraCount > 0 && ` +${extraCount} más`}
           </p>
         </div>

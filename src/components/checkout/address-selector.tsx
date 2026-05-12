@@ -33,7 +33,7 @@ export function AddressSelector({
         <span className="flex-1 truncate">
           {selected ? (
             <>
-              <span className="font-medium">{selected.label}</span>
+              <span className="font-medium">{selected.alias}</span>
               <span className="text-muted-foreground">
                 {" · "}
                 {selected.street}, {selected.city}
@@ -62,7 +62,7 @@ export function AddressSelector({
             >
               <MapPin className="mt-0.5 size-4 shrink-0" />
               <div>
-                <p className="font-medium">{address.label}</p>
+                <p className="font-medium">{address.alias}</p>
                 <p className="text-xs text-muted-foreground">
                   {address.street}, {address.city}
                 </p>

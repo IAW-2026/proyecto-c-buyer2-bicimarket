@@ -9,160 +9,18 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// ============================================
-// Base User model synced from Clerk via webhook
-// Each app should extend this with its own models
-// ============================================
-model User {
-  id             String       @id // Clerk user ID
-  email          String       @unique
-  firstName      String?
-  lastName       String?
-  imageUrl       String?
-  role           Role         @default(USER)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  buyerProfile   BuyerProfile?
-}
+// ─── Enums ────────────────────────────────────────────────────────────────────
 
-enum Role {
-  USER
-  ADMIN
-}
-
-model Product {
-  id          String   @id @default(cuid())
-  title       String
-  description String
-  price       Float    @default(0)
-  imageUrl    String?
-  sellerId    String?
-  sellerName  String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-model BuyerProfile {
-  id             String     @id @default(cuid())
-  userId         String     @unique
-  displayName    String
-  phone          String?
-  documentNumber String?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-
-  user          User?      @relation(fields: [userId], references: [id])
-  addresses     Address[]
-  cart          Cart?
-  favoriteItems FavoriteItem[]
-  orders        Order[]
-}
-
-model Address {
-  id             String      @id @default(cuid())
-  buyerProfile   BuyerProfile @relation(fields: [buyerProfileId], references: [id])
-  buyerProfileId String
-  label          String
-  street         String
-  city           String
-  state          String?
-  zip            String
-  country        String
-  phone          String?
-  isDefault      Boolean     @default(false)
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-}
-
-model Cart {
-  id             String      @id @default(cuid())
-  buyerProfile   BuyerProfile @relation(fields: [buyerProfileId], references: [id])
-  buyerProfileId String      @unique
-  items          CartItem[]
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-}
-
-model CartItem {
-  id        String   @id @default(cuid())
-  cart      Cart     @relation(fields: [cartId], references: [id])
-  cartId    String
-  productId String
-  title     String
-  description String
-  unitPrice Float
-  quantity  Int      @default(1)
-  subtotal  Float
-  sellerId  String
-  sellerName String?
-  imageUrl  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model FavoriteItem {
-  id             String      @id @default(cuid())
-  buyerProfile   BuyerProfile @relation(fields: [buyerProfileId], references: [id])
-  buyerProfileId String
-  productId      String
-  title          String
-  description    String
-  sellerId       String
-  sellerName     String?
-  imageUrl       String?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-}
-
-model Order {
-  id                String               @id @default(cuid())
-  buyerProfile      BuyerProfile         @relation(fields: [buyerProfileId], references: [id])
-  buyerProfileId    String
-  orderNumber       String               @unique
-  status            OrderStatus          @default(PENDING_PAYMENT)
-  totalAmount       Float
-  shippingAmount    Float
-  paymentId         String?
-  shippingAddressId String?
-  sellerGroups      OrderSellerGroup[]
-  items             OrderItem[]
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
-}
-
-model OrderSellerGroup {
-  id                 String      @id @default(cuid())
-  order              Order       @relation(fields: [orderId], references: [id])
-  orderId            String
-  sellerId           String
-  sellerName         String?
-  shippingCost       Float
-  status             SellerGroupStatus @default(PENDING)
-  orderItems         OrderItem[]
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
-}
-
-model OrderItem {
-  id                  String             @id @default(cuid())
-  order               Order              @relation(fields: [orderId], references: [id])
-  orderId             String
-  orderSellerGroup    OrderSellerGroup?  @relation(fields: [orderSellerGroupId], references: [id])
-  orderSellerGroupId  String?
-  productId           String
-  title               String
-  quantity            Int
-  unitPrice           Float
-  subtotal            Float
-  sellerId            String
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+enum CartStatus {
+  ACTIVE
+  CONVERTED
+  ABANDONED
 }
 
 enum OrderStatus {
   PENDING_PAYMENT
   PAID
+  PAYMENT_FAILED
   PARTIALLY_SHIPPED
   SHIPPED
   DELIVERED
@@ -178,4 +36,161 @@ enum SellerGroupStatus {
   IN_TRANSIT
   DELIVERED
   SETTLED
+  CANCELLED
+  REFUNDED
+}
+
+enum ShippingStatus {
+  CREATED
+  READY_FOR_PICKUP
+  PICKED_UP
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  FAILED_DELIVERY
+  RETURNED
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model BuyerProfile {
+  id                       String    @id @default(cuid())
+  clerkUserId              String    @unique
+  fullName                 String
+  email                    String    @unique
+  phone                    String?
+  defaultShippingAddressId String?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  deletedAt                DateTime?
+
+  defaultShippingAddress Address?       @relation("DefaultShippingAddress", fields: [defaultShippingAddressId], references: [id], onDelete: SetNull)
+  addresses              Address[]      @relation("OwnedAddresses")
+  cart                   Cart?
+  favoriteItems          FavoriteItem[]
+  orders                 Order[]
+}
+
+model Address {
+  id             String   @id @default(cuid())
+  buyerProfileId String
+  alias          String
+  street         String
+  number         String
+  apartment      String?
+  city           String
+  province       String
+  postalCode     String
+  country        String
+  isDefault      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  buyerProfile      BuyerProfile   @relation("OwnedAddresses", fields: [buyerProfileId], references: [id], onDelete: Cascade)
+  defaultForProfile BuyerProfile[] @relation("DefaultShippingAddress")
+}
+
+model Cart {
+  id             String     @id @default(cuid())
+  buyerProfileId String     @unique
+  status         CartStatus @default(ACTIVE)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  buyerProfile BuyerProfile @relation(fields: [buyerProfileId], references: [id])
+  items        CartItem[]
+}
+
+model CartItem {
+  id                  String   @id @default(cuid())
+  cartId              String
+  productId           String
+  sellerProfileId     String
+  productNameSnapshot String
+  unitPriceCents      Int
+  currency            String   @default("ARS")
+  quantity            Int      @default(1)
+  weightGramsSnapshot Int
+  addedAt             DateTime @default(now())
+
+  cart Cart @relation(fields: [cartId], references: [id])
+
+  @@unique([cartId, productId])
+}
+
+model FavoriteItem {
+  id             String   @id @default(cuid())
+  buyerProfileId String
+  productId      String
+  addedAt        DateTime @default(now())
+
+  buyerProfile BuyerProfile @relation(fields: [buyerProfileId], references: [id])
+
+  @@unique([buyerProfileId, productId])
+}
+
+model Order {
+  id                      String      @id @default(cuid())
+  buyerProfileId          String
+  paymentId               String?
+  status                  OrderStatus @default(PENDING_PAYMENT)
+  itemsTotalCents         Int
+  shippingTotalCents      Int
+  totalCents              Int
+  currency                String      @default("ARS")
+  shippingAddressSnapshot Json
+  notes                   String?
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  buyerProfile  BuyerProfile         @relation(fields: [buyerProfileId], references: [id])
+  sellerGroups  OrderSellerGroup[]
+  items         OrderItem[]
+  statusHistory OrderStatusHistory[]
+}
+
+model OrderSellerGroup {
+  id                 String            @id @default(cuid())
+  orderId            String
+  sellerProfileId    String
+  itemsSubtotalCents Int
+  shippingCostCents  Int
+  shippingQuoteId    String?
+  shipmentId         String?
+  weightGramsTotal   Int
+  status             SellerGroupStatus @default(PENDING)
+  shippingStatus     ShippingStatus?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  order      Order       @relation(fields: [orderId], references: [id])
+  orderItems OrderItem[]
+
+  @@unique([orderId, sellerProfileId])
+}
+
+model OrderItem {
+  id                  String   @id @default(cuid())
+  orderId             String
+  sellerGroupId       String
+  productId           String
+  productNameSnapshot String
+  unitPriceCents      Int
+  quantity            Int
+  weightGramsSnapshot Int
+
+  order       Order            @relation(fields: [orderId], references: [id])
+  sellerGroup OrderSellerGroup @relation(fields: [sellerGroupId], references: [id])
+}
+
+model OrderStatusHistory {
+  id         String   @id @default(cuid())
+  orderId    String
+  fromStatus String
+  toStatus   String
+  source     String
+  payload    Json?
+  occurredAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id])
 }

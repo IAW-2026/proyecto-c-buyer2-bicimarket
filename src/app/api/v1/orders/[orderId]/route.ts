@@ -1,9 +1,7 @@
-// PATCH /api/v1/orders/{orderId}/status
+// PATCH /api/v1/orders/{orderId}
 // Payments App → Buyer App
 //
-// Payments llama este endpoint cuando el estado del pago cambia
-// (ej: cuando Mercado Pago confirma el pago, Payments PATCH-ea acá con status="paid")
-//
+// Payments llama este endpoint cuando el estado del pago cambia.
 // Autenticación: X-Service-Token (no JWT de Clerk)
 // Variable de entorno requerida: PAYMENTS_TO_BUYER_SERVICE_TOKEN
 
@@ -11,21 +9,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { validateServiceToken } from "@/lib/service-auth";
+import type { OrderStatus } from "@/generated/prisma";
 
 const patchSchema = z.object({
-  status: z.enum([
-    "paid",
-    "payment_failed",
-    "cancelled",
-    "refunded",
-  ]),
+  status: z.enum(["paid", "payment_failed", "cancelled", "refunded"]),
   payment_id: z.string().optional(),
 });
 
-// Mapeo de estados de Payments hacia los estados de Order en Buyer App
-const STATUS_MAP: Record<string, string> = {
+const STATUS_MAP: Record<string, OrderStatus> = {
   paid: "PAID",
-  payment_failed: "CANCELLED",
+  payment_failed: "PAYMENT_FAILED",
   cancelled: "CANCELLED",
   refunded: "REFUNDED",
 };
@@ -56,15 +49,26 @@ export async function PATCH(
     );
   }
 
-  const newStatus = STATUS_MAP[parsed.data.status] as Parameters<typeof prisma.order.update>[0]["data"]["status"];
+  const newStatus = STATUS_MAP[parsed.data.status];
 
-  const updated = await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      status: newStatus,
-      ...(parsed.data.payment_id ? { paymentId: parsed.data.payment_id } : {}),
-    },
-  });
+  const [updated] = await Promise.all([
+    prisma.order.update({
+      where: { id: orderId },
+      data: {
+        status: newStatus,
+        ...(parsed.data.payment_id ? { paymentId: parsed.data.payment_id } : {}),
+      },
+    }),
+    prisma.orderStatusHistory.create({
+      data: {
+        orderId,
+        fromStatus: order.status,
+        toStatus: newStatus,
+        source: "payments",
+        payload: parsed.data.payment_id ? { payment_id: parsed.data.payment_id } : undefined,
+      },
+    }),
+  ]);
 
   return NextResponse.json({ id: updated.id, status: updated.status });
 }

@@ -18,7 +18,7 @@ export function StatCards() {
         <p className="text-3xl font-bold">{ordersTotal}</p>
       </StatCard>
 
-      <StatCard label="Última orden" sublabel={lastOrder?.orderNumber.slice(-6) ? `ORD-...${lastOrder.orderNumber.slice(-4)}` : "—"}>
+      <StatCard label="Última orden" sublabel={lastOrder ? `…${lastOrder.id.slice(-6)}` : "—"}>
         {lastOrder ? (
           <OrderStatusBadge status={lastOrder.status} />
         ) : (

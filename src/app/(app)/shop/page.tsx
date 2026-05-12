@@ -23,25 +23,16 @@ export default function ShopPage() {
   async function handleAddToCart(product: Product) {
     await addCartItem.mutateAsync({
       productId: product.id,
-      title: product.title,
-      description: product.description,
-      unitPrice: product.price ?? 0,
+      sellerProfileId: product.sellerId ?? "unknown",
+      productNameSnapshot: product.title,
+      unitPriceCents: Math.round((product.price ?? 0) * 100),
       quantity: 1,
-      sellerId: product.sellerId ?? "unknown",
-      sellerName: product.sellerName ?? undefined,
-      imageUrl: product.imageUrl ?? undefined,
+      weightGramsSnapshot: 0,
     });
   }
 
   async function handleToggleFavorite(product: Product) {
-    await addFavoriteItem.mutateAsync({
-      productId: product.id,
-      title: product.title,
-      description: product.description,
-      sellerId: product.sellerId ?? "unknown",
-      sellerName: product.sellerName ?? undefined,
-      imageUrl: product.imageUrl ?? undefined,
-    });
+    await addFavoriteItem.mutateAsync({ productId: product.id });
   }
 
   return (

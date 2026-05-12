@@ -121,7 +121,7 @@ export default function CheckoutPage() {
             <div className="space-y-2">
               <h2 className="font-heading text-base font-semibold">Tu pedido</h2>
               {sellerGroups.map((group) => (
-                <SellerGroupPreview key={group.sellerId} group={group} />
+                <SellerGroupPreview key={group.sellerProfileId} group={group} />
               ))}
             </div>
           </div>
@@ -134,7 +134,7 @@ export default function CheckoutPage() {
               <div className="space-y-1.5 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal productos</span>
-                  <PriceDisplay amount={cart.total} />
+                  <PriceDisplay amount={cart.totalCents / 100} />
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Total de envíos</span>
@@ -146,7 +146,7 @@ export default function CheckoutPage() {
                 <div className="flex justify-between">
                   <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total</span>
                   <PriceDisplay
-                    amount={cart.total + totalShipping}
+                    amount={cart.totalCents / 100 + totalShipping}
                     className="text-2xl font-bold"
                   />
                 </div>

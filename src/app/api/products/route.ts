@@ -1,38 +1,25 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
+import { getSellerProducts } from "@/lib/seller-api";
+import type { Product } from "@/types/buyer";
+import type { SellerProduct } from "@/types/inter-service";
 
-// GET /api/products — lista todos los productos
-export async function GET() {
-  const products = await prisma.product.findMany({
-    orderBy: { createdAt: "desc" },
-  });
-
-  return NextResponse.json(products);
+function toProduct(p: SellerProduct): Product {
+  return {
+    id: p.id,
+    title: p.title,
+    description: p.description,
+    price: p.price,
+    imageUrl: p.image_url,
+    sellerId: p.seller_profile_id,
+    sellerName: p.seller_name,
+    isActive: p.status === "active",
+    createdAt: p.created_at,
+    updatedAt: p.updated_at,
+  };
 }
 
-// POST /api/products — crea un producto
-export async function POST(request: NextRequest) {
-  const body = await request.json();
-
-  const { title, description, price, sellerId, sellerName, imageUrl } = body;
-
-  if (!title || !description) {
-    return NextResponse.json(
-      { error: "title y description son requeridos" },
-      { status: 400 },
-    );
-  }
-
-  const product = await prisma.product.create({
-    data: {
-      title,
-      description,
-      price: typeof price === "number" ? price : 0,
-      sellerId: sellerId ?? null,
-      sellerName: sellerName ?? null,
-      imageUrl: imageUrl ?? null,
-    },
-  });
-
-  return NextResponse.json(product, { status: 201 });
+// GET /api/products — catálogo de productos (proxied desde Seller App)
+export async function GET() {
+  const { data } = await getSellerProducts({ status: "active" });
+  return NextResponse.json(data.map(toProduct));
 }

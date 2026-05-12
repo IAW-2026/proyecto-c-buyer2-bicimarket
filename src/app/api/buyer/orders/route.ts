@@ -19,11 +19,5 @@ export async function GET() {
     },
   });
 
-  return NextResponse.json(
-    orders.map((order) => ({
-      ...order,
-      totalAmount: Number(order.totalAmount),
-      shippingAmount: Number(order.shippingAmount),
-    })),
-  );
+  return NextResponse.json(orders);
 }

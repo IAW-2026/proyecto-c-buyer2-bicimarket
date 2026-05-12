@@ -5,9 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { getOrCreateBuyerProfile } from "@/lib/buyer-service";
 
 const updateProfileSchema = z.object({
-  displayName: z.string().min(2),
+  fullName: z.string().min(2).optional(),
   phone: z.string().optional(),
-  documentNumber: z.string().optional(),
 });
 
 export async function GET() {
@@ -30,7 +29,7 @@ export async function PATCH(request: NextRequest) {
   const parsed = updateProfileSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: parsed.error.issues.map((item) => item.message).join(", ") },
+      { error: parsed.error.issues.map((i) => i.message).join(", ") },
       { status: 400 },
     );
   }

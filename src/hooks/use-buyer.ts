@@ -49,7 +49,7 @@ export function useCreateAddress() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (
-      address: Omit<Address, "id" | "createdAt" | "updatedAt">,
+      address: Omit<Address, "id" | "buyerProfileId" | "createdAt" | "updatedAt">,
     ) => {
       const { data } = await api.post<Address>("/buyer/addresses", address);
       return data;
@@ -85,13 +85,12 @@ export function useAddCartItem() {
   return useMutation({
     mutationFn: async (payload: {
       productId: string;
-      title: string;
-      description: string;
-      unitPrice: number;
+      sellerProfileId: string;
+      productNameSnapshot: string;
+      unitPriceCents: number;
       quantity: number;
-      sellerId: string;
-      sellerName?: string;
-      imageUrl?: string;
+      weightGramsSnapshot: number;
+      currency?: string;
     }) => {
       const { data } = await api.post<CartItem>("/buyer/cart", payload);
       return data;
@@ -145,14 +144,7 @@ export function useFavoriteItems() {
 export function useAddFavoriteItem() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: {
-      productId: string;
-      title: string;
-      description: string;
-      sellerId: string;
-      sellerName?: string;
-      imageUrl?: string;
-    }) => {
+    mutationFn: async (payload: { productId: string }) => {
       const { data } = await api.post<FavoriteItem>(
         "/buyer/favorites",
         payload,
@@ -226,17 +218,3 @@ export function useProducts() {
   });
 }
 
-export function useCreateProduct() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (newProduct: {
-      title: string;
-      description: string;
-      price?: number;
-    }) => {
-      const { data } = await api.post<Product>("/products", newProduct);
-      return data;
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["products"] }),
-  });
-}

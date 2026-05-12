@@ -13,13 +13,14 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const addressSchema = z.object({
-  label: z.string().min(1, "Nombre requerido"),
+  alias: z.string().min(1, "Nombre requerido"),
   street: z.string().min(1, "Calle requerida"),
+  number: z.string().min(1, "Número requerido"),
+  apartment: z.string().optional(),
   city: z.string().min(1, "Ciudad requerida"),
-  state: z.string().optional(),
-  zip: z.string().min(1, "Código postal requerido"),
+  province: z.string().optional(),
+  postalCode: z.string().min(1, "Código postal requerido"),
   country: z.string().min(1),
-  phone: z.string().optional(),
 });
 
 type AddressFormValues = z.infer<typeof addressSchema>;
@@ -32,11 +33,11 @@ export function AddressList() {
 
   const form = useForm<AddressFormValues>({
     resolver: zodResolver(addressSchema),
-    defaultValues: { label: "", street: "", city: "", zip: "", country: "AR" },
+    defaultValues: { alias: "", street: "", number: "", city: "", postalCode: "", country: "AR" },
   });
 
   const onSubmit = async (values: AddressFormValues) => {
-    await createAddress.mutateAsync({ ...values, isDefault: false });
+    await createAddress.mutateAsync({ ...values, province: values.province ?? "", isDefault: false });
     form.reset({ country: "AR" });
     setShowForm(false);
   };
@@ -59,14 +60,13 @@ export function AddressList() {
           className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-card px-4 py-3"
         >
           <div>
-            <p className="text-sm font-semibold">{address.label}</p>
+            <p className="text-sm font-semibold">{address.alias}</p>
             <p className="text-xs text-muted-foreground">
-              {address.street}, {address.city}
-              {address.state ? `, ${address.state}` : ""} · CP {address.zip}
+              {address.street} {address.number}
+              {address.apartment ? `, ${address.apartment}` : ""}
+              {" · "}{address.city}
+              {address.province ? `, ${address.province}` : ""} · CP {address.postalCode}
             </p>
-            {address.phone && (
-              <p className="text-xs text-muted-foreground">{address.phone}</p>
-            )}
           </div>
           <Button
             variant="ghost"
@@ -89,23 +89,31 @@ export function AddressList() {
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="grid gap-1">
               <Label>Nombre (ej: Casa, Trabajo)</Label>
-              <Input placeholder="Casa" {...form.register("label")} />
+              <Input placeholder="Casa" {...form.register("alias")} />
             </div>
             <div className="grid gap-1">
-              <Label>Teléfono</Label>
-              <Input placeholder="+54 9 11 0000-0000" {...form.register("phone")} />
+              <Label>Calle</Label>
+              <Input placeholder="Av. Corrientes" {...form.register("street")} />
             </div>
-            <div className="sm:col-span-2 grid gap-1">
-              <Label>Calle y número</Label>
-              <Input placeholder="Av. Corrientes 1234" {...form.register("street")} />
+            <div className="grid gap-1">
+              <Label>Número</Label>
+              <Input placeholder="1234" {...form.register("number")} />
+            </div>
+            <div className="grid gap-1">
+              <Label>Piso / Depto (opcional)</Label>
+              <Input placeholder="3B" {...form.register("apartment")} />
             </div>
             <div className="grid gap-1">
               <Label>Ciudad</Label>
               <Input placeholder="Buenos Aires" {...form.register("city")} />
             </div>
             <div className="grid gap-1">
+              <Label>Provincia</Label>
+              <Input placeholder="Buenos Aires" {...form.register("province")} />
+            </div>
+            <div className="grid gap-1">
               <Label>Código postal</Label>
-              <Input placeholder="1043" {...form.register("zip")} />
+              <Input placeholder="1043" {...form.register("postalCode")} />
             </div>
           </div>
           <div className="flex items-center gap-2">

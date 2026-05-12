@@ -1,31 +1,16 @@
 "use client";
 
 import { Heart } from "lucide-react";
-import { useFavoriteItems, useRemoveFavoriteItem, useAddCartItem } from "@/hooks/use-buyer";
+import { useFavoriteItems, useRemoveFavoriteItem } from "@/hooks/use-buyer";
 import { FavoriteCard } from "@/components/favorites/favorite-card";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { buttonVariants } from "@/components/ui/button";
 import Link from "next/link";
-import type { FavoriteItem } from "@/types/buyer";
 
 export default function FavoritesPage() {
   const { data: favorites, isLoading } = useFavoriteItems();
   const removeFavorite = useRemoveFavoriteItem();
-  const addCartItem = useAddCartItem();
-
-  async function handleAddToCart(item: FavoriteItem) {
-    await addCartItem.mutateAsync({
-      productId: item.productId,
-      title: item.title,
-      description: item.description,
-      unitPrice: 0,
-      quantity: 1,
-      sellerId: item.sellerId,
-      sellerName: item.sellerName ?? undefined,
-      imageUrl: item.imageUrl ?? undefined,
-    });
-  }
 
   if (isLoading) return <FavoritesSkeleton />;
 
@@ -57,9 +42,7 @@ export default function FavoritesPage() {
             <FavoriteCard
               key={item.id}
               item={item}
-              onAddToCart={handleAddToCart}
               onRemove={(id) => removeFavorite.mutate(id)}
-              isAddingToCart={addCartItem.isPending}
               isRemoving={removeFavorite.isPending}
             />
           ))}

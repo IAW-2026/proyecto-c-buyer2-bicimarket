@@ -29,18 +29,17 @@ export function CartItemCard({
     <Card className="border border-border/60">
       <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <CardTitle>{item.title}</CardTitle>
-          <CardDescription>{item.description}</CardDescription>
+          <CardTitle>{item.productNameSnapshot}</CardTitle>
         </div>
-        <Badge variant="outline">{item.sellerName ?? "Vendedor"}</Badge>
+        <Badge variant="outline">{item.sellerProfileId}</Badge>
       </CardHeader>
       <CardContent className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">
-            Precio unitario: ${item.unitPrice.toFixed(2)}
+            Precio unitario: ${(item.unitPriceCents / 100).toFixed(2)}
           </p>
           <p className="text-sm text-muted-foreground">
-            Subtotal: ${item.subtotal.toFixed(2)}
+            Subtotal: ${((item.unitPriceCents * item.quantity) / 100).toFixed(2)}
           </p>
           <p className="text-xs text-muted-foreground">ID: {item.productId}</p>
         </div>

@@ -20,7 +20,7 @@ export async function PATCH(
   const parsed = quantitySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: parsed.error.issues.map((item) => item.message).join(", ") },
+      { error: parsed.error.issues.map((i) => i.message).join(", ") },
       { status: 400 },
     );
   }
@@ -39,10 +39,7 @@ export async function PATCH(
 
   const updated = await prisma.cartItem.update({
     where: { id: itemId },
-    data: {
-      quantity: parsed.data.quantity,
-      subtotal: Number((parsed.data.quantity * item.unitPrice).toFixed(2)),
-    },
+    data: { quantity: parsed.data.quantity },
   });
 
   return NextResponse.json(updated);

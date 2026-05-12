@@ -13,68 +13,73 @@ export type Product = {
 
 export type BuyerProfile = {
   id: string;
-  userId: string;
-  displayName: string;
+  clerkUserId: string;
+  fullName: string;
+  email: string;
   phone?: string | null;
-  documentNumber?: string | null;
+  defaultShippingAddressId?: string | null;
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string | null;
 };
 
 export type Address = {
   id: string;
-  label: string;
+  buyerProfileId: string;
+  alias: string;
   street: string;
+  number: string;
+  apartment?: string | null;
   city: string;
-  state?: string | null;
-  zip: string;
+  province: string;
+  postalCode: string;
   country: string;
-  phone?: string | null;
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
 };
 
+export enum CartStatus {
+  ACTIVE = "ACTIVE",
+  CONVERTED = "CONVERTED",
+  ABANDONED = "ABANDONED",
+}
+
 export type CartItem = {
   id: string;
+  cartId: string;
   productId: string;
-  title: string;
-  description: string;
-  unitPrice: number;
+  sellerProfileId: string;
+  productNameSnapshot: string;
+  unitPriceCents: number;
+  currency: string;
   quantity: number;
-  sellerId: string;
-  sellerName?: string | null;
-  imageUrl?: string | null;
-  createdAt: string;
-  updatedAt: string;
-  subtotal: number;
+  weightGramsSnapshot: number;
+  addedAt: string;
 };
 
 export type Cart = {
   id: string;
   buyerProfileId: string;
+  status: CartStatus;
   items: CartItem[];
   createdAt: string;
   updatedAt: string;
-  total: number;
+  totalCents: number;
   itemCount: number;
 };
 
 export type FavoriteItem = {
   id: string;
+  buyerProfileId: string;
   productId: string;
-  title: string;
-  description: string;
-  sellerId: string;
-  sellerName?: string | null;
-  imageUrl?: string | null;
-  createdAt: string;
-  updatedAt: string;
+  addedAt: string;
 };
 
 export enum OrderStatus {
   PENDING_PAYMENT = "PENDING_PAYMENT",
   PAID = "PAID",
+  PAYMENT_FAILED = "PAYMENT_FAILED",
   PARTIALLY_SHIPPED = "PARTIALLY_SHIPPED",
   SHIPPED = "SHIPPED",
   DELIVERED = "DELIVERED",
@@ -90,43 +95,59 @@ export enum SellerGroupStatus {
   IN_TRANSIT = "IN_TRANSIT",
   DELIVERED = "DELIVERED",
   SETTLED = "SETTLED",
+  CANCELLED = "CANCELLED",
+  REFUNDED = "REFUNDED",
+}
+
+export enum ShippingStatus {
+  CREATED = "CREATED",
+  READY_FOR_PICKUP = "READY_FOR_PICKUP",
+  PICKED_UP = "PICKED_UP",
+  IN_TRANSIT = "IN_TRANSIT",
+  OUT_FOR_DELIVERY = "OUT_FOR_DELIVERY",
+  DELIVERED = "DELIVERED",
+  FAILED_DELIVERY = "FAILED_DELIVERY",
+  RETURNED = "RETURNED",
 }
 
 export type OrderSellerGroup = {
   id: string;
   orderId: string;
-  sellerId: string;
-  sellerName?: string | null;
-  shippingCost: number;
+  sellerProfileId: string;
+  itemsSubtotalCents: number;
+  shippingCostCents: number;
+  shippingQuoteId?: string | null;
+  shipmentId?: string | null;
+  weightGramsTotal: number;
   status: SellerGroupStatus;
+  shippingStatus?: ShippingStatus | null;
   createdAt: string;
   updatedAt: string;
-  itemCount: number;
+  orderItems?: OrderItem[];
 };
 
 export type OrderItem = {
   id: string;
   orderId: string;
-  orderSellerGroupId?: string | null;
+  sellerGroupId: string;
   productId: string;
-  title: string;
+  productNameSnapshot: string;
+  unitPriceCents: number;
   quantity: number;
-  unitPrice: number;
-  subtotal: number;
-  sellerId: string;
-  createdAt: string;
-  updatedAt: string;
+  weightGramsSnapshot: number;
 };
 
 export type Order = {
   id: string;
-  orderNumber: string;
   buyerProfileId: string;
-  status: OrderStatus;
-  totalAmount: number;
-  shippingAmount: number;
   paymentId?: string | null;
-  shippingAddressId?: string | null;
+  status: OrderStatus;
+  itemsTotalCents: number;
+  shippingTotalCents: number;
+  totalCents: number;
+  currency: string;
+  shippingAddressSnapshot: Record<string, unknown>;
+  notes?: string | null;
   createdAt: string;
   updatedAt: string;
   items: OrderItem[];
