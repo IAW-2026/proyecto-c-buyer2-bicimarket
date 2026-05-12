@@ -1,0 +1,181 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================
+// Base User model synced from Clerk via webhook
+// Each app should extend this with its own models
+// ============================================
+model User {
+  id             String       @id // Clerk user ID
+  email          String       @unique
+  firstName      String?
+  lastName       String?
+  imageUrl       String?
+  role           Role         @default(USER)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  buyerProfile   BuyerProfile?
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  price       Float    @default(0)
+  imageUrl    String?
+  sellerId    String?
+  sellerName  String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model BuyerProfile {
+  id             String     @id @default(cuid())
+  userId         String     @unique
+  displayName    String
+  phone          String?
+  documentNumber String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  user          User?      @relation(fields: [userId], references: [id])
+  addresses     Address[]
+  cart          Cart?
+  favoriteItems FavoriteItem[]
+  orders        Order[]
+}
+
+model Address {
+  id             String      @id @default(cuid())
+  buyerProfile   BuyerProfile @relation(fields: [buyerProfileId], references: [id])
+  buyerProfileId String
+  label          String
+  street         String
+  city           String
+  state          String?
+  zip            String
+  country        String
+  phone          String?
+  isDefault      Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model Cart {
+  id             String      @id @default(cuid())
+  buyerProfile   BuyerProfile @relation(fields: [buyerProfileId], references: [id])
+  buyerProfileId String      @unique
+  items          CartItem[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cart      Cart     @relation(fields: [cartId], references: [id])
+  cartId    String
+  productId String
+  title     String
+  description String
+  unitPrice Float
+  quantity  Int      @default(1)
+  subtotal  Float
+  sellerId  String
+  sellerName String?
+  imageUrl  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FavoriteItem {
+  id             String      @id @default(cuid())
+  buyerProfile   BuyerProfile @relation(fields: [buyerProfileId], references: [id])
+  buyerProfileId String
+  productId      String
+  title          String
+  description    String
+  sellerId       String
+  sellerName     String?
+  imageUrl       String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model Order {
+  id                String               @id @default(cuid())
+  buyerProfile      BuyerProfile         @relation(fields: [buyerProfileId], references: [id])
+  buyerProfileId    String
+  orderNumber       String               @unique
+  status            OrderStatus          @default(PENDING_PAYMENT)
+  totalAmount       Float
+  shippingAmount    Float
+  paymentId         String?
+  shippingAddressId String?
+  sellerGroups      OrderSellerGroup[]
+  items             OrderItem[]
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+}
+
+model OrderSellerGroup {
+  id                 String      @id @default(cuid())
+  order              Order       @relation(fields: [orderId], references: [id])
+  orderId            String
+  sellerId           String
+  sellerName         String?
+  shippingCost       Float
+  status             SellerGroupStatus @default(PENDING)
+  orderItems         OrderItem[]
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+}
+
+model OrderItem {
+  id                  String             @id @default(cuid())
+  order               Order              @relation(fields: [orderId], references: [id])
+  orderId             String
+  orderSellerGroup    OrderSellerGroup?  @relation(fields: [orderSellerGroupId], references: [id])
+  orderSellerGroupId  String?
+  productId           String
+  title               String
+  quantity            Int
+  unitPrice           Float
+  subtotal            Float
+  sellerId            String
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  PARTIALLY_SHIPPED
+  SHIPPED
+  DELIVERED
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum SellerGroupStatus {
+  PENDING
+  PREPARING
+  READY_TO_SHIP
+  IN_TRANSIT
+  DELIVERED
+  SETTLED
+}
