@@ -20,13 +20,15 @@ export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ addressId: string }> },
 ) {
-  const { userId } = await auth();
-  const { addressId } = await context.params;
+  const [{ userId }, { addressId }, body] = await Promise.all([
+    auth(),
+    context.params,
+    request.json(),
+  ]);
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
   const parsed = addressSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

@@ -16,7 +16,7 @@ export function useBuyerProfile() {
   return useQuery<BuyerProfile>({
     queryKey: ["buyer-profile"],
     queryFn: async () => {
-      const { data } = await api.get<BuyerProfile>("/buyer/profile");
+      const { data } = await api.get<BuyerProfile>("/v1/buyer/profile");
       return data;
     },
   });
@@ -26,7 +26,7 @@ export function useUpdateBuyerProfile() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (payload: Partial<BuyerProfile>) => {
-      const { data } = await api.patch<BuyerProfile>("/buyer/profile", payload);
+      const { data } = await api.patch<BuyerProfile>("/v1/buyer/profile", payload);
       return data;
     },
     onSuccess: () => {
@@ -39,7 +39,7 @@ export function useBuyerAddresses() {
   return useQuery<Address[]>({
     queryKey: ["buyer-addresses"],
     queryFn: async () => {
-      const { data } = await api.get<Address[]>("/buyer/addresses");
+      const { data } = await api.get<Address[]>("/v1/buyer/addresses");
       return data;
     },
   });
@@ -51,7 +51,7 @@ export function useCreateAddress() {
     mutationFn: async (
       address: Omit<Address, "id" | "buyerProfileId" | "createdAt" | "updatedAt">,
     ) => {
-      const { data } = await api.post<Address>("/buyer/addresses", address);
+      const { data } = await api.post<Address>("/v1/buyer/addresses", address);
       return data;
     },
     onSuccess: () =>
@@ -63,7 +63,7 @@ export function useDeleteAddress() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (addressId: string) => {
-      await api.delete(`/buyer/addresses/${addressId}`);
+      await api.delete(`/v1/buyer/addresses/${addressId}`);
     },
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["buyer-addresses"] }),
@@ -74,7 +74,7 @@ export function useBuyerCart() {
   return useQuery<Cart>({
     queryKey: ["buyer-cart"],
     queryFn: async () => {
-      const { data } = await api.get<Cart>("/buyer/cart");
+      const { data } = await api.get<Cart>("/v1/buyer/cart");
       return data;
     },
   });
@@ -92,7 +92,7 @@ export function useAddCartItem() {
       weightGramsSnapshot: number;
       currency?: string;
     }) => {
-      const { data } = await api.post<CartItem>("/buyer/cart", payload);
+      const { data } = await api.post<CartItem>("/v1/buyer/cart", payload);
       return data;
     },
     onSuccess: () =>
@@ -110,7 +110,7 @@ export function useUpdateCartItem() {
       itemId: string;
       quantity: number;
     }) => {
-      const { data } = await api.patch<CartItem>(`/buyer/cart/${itemId}`, {
+      const { data } = await api.patch<CartItem>(`/v1/buyer/cart/${itemId}`, {
         quantity,
       });
       return data;
@@ -124,7 +124,7 @@ export function useRemoveCartItem() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (itemId: string) => {
-      await api.delete(`/buyer/cart/${itemId}`);
+      await api.delete(`/v1/buyer/cart/${itemId}`);
     },
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["buyer-cart"] }),
@@ -135,7 +135,7 @@ export function useFavoriteItems() {
   return useQuery<FavoriteItem[]>({
     queryKey: ["favorite-items"],
     queryFn: async () => {
-      const { data } = await api.get<FavoriteItem[]>("/buyer/favorites");
+      const { data } = await api.get<FavoriteItem[]>("/v1/buyer/favorites");
       return data;
     },
   });
@@ -146,7 +146,7 @@ export function useAddFavoriteItem() {
   return useMutation({
     mutationFn: async (payload: { productId: string }) => {
       const { data } = await api.post<FavoriteItem>(
-        "/buyer/favorites",
+        "/v1/buyer/favorites",
         payload,
       );
       return data;
@@ -160,7 +160,7 @@ export function useRemoveFavoriteItem() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (favoriteId: string) => {
-      await api.delete(`/buyer/favorites/${favoriteId}`);
+      await api.delete(`/v1/buyer/favorites/${favoriteId}`);
     },
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["favorite-items"] }),
@@ -171,7 +171,7 @@ export function useBuyerOrders() {
   return useQuery<Order[]>({
     queryKey: ["buyer-orders"],
     queryFn: async () => {
-      const { data } = await api.get<Order[]>("/buyer/orders");
+      const { data } = await api.get<Order[]>("/v1/buyer/orders");
       return data;
     },
   });
@@ -181,7 +181,7 @@ export function useBuyerOrder(orderId: string) {
   return useQuery<Order>({
     queryKey: ["buyer-orders", orderId],
     queryFn: async () => {
-      const { data } = await api.get<Order>(`/buyer/orders/${orderId}`);
+      const { data } = await api.get<Order>(`/v1/buyer/orders/${orderId}`);
       return data;
     },
     enabled: Boolean(orderId),
@@ -196,7 +196,7 @@ export function useCheckoutCart() {
       returnUrl: string;
     }) => {
       const { data } = await api.post<{ paymentUrl: string; orderId: string }>(
-        "/buyer/checkout",
+        "/v1/buyer/checkout",
         payload,
       );
       return data;

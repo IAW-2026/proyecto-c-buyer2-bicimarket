@@ -32,12 +32,11 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const { userId } = await auth();
+  const [{ userId }, body] = await Promise.all([auth(), request.json()]);
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
   const parsed = addressSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

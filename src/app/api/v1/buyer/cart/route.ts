@@ -39,12 +39,11 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const { userId } = await auth();
+  const [{ userId }, body] = await Promise.all([auth(), request.json()]);
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
   const parsed = cartItemSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -60,23 +59,14 @@ export async function POST(request: NextRequest) {
     update: {},
   });
 
-  const existing = await prisma.cartItem.findFirst({
+  const isNew = !(await prisma.cartItem.findFirst({
     where: { cartId: cart.id, productId: parsed.data.productId },
-  });
+    select: { id: true },
+  }));
 
-  if (existing) {
-    const updated = await prisma.cartItem.update({
-      where: { id: existing.id },
-      data: {
-        quantity: existing.quantity + parsed.data.quantity,
-        unitPriceCents: parsed.data.unitPriceCents,
-      },
-    });
-    return NextResponse.json(updated);
-  }
-
-  const item = await prisma.cartItem.create({
-    data: {
+  const item = await prisma.cartItem.upsert({
+    where: { cartId_productId: { cartId: cart.id, productId: parsed.data.productId } },
+    create: {
       cartId: cart.id,
       productId: parsed.data.productId,
       sellerProfileId: parsed.data.sellerProfileId,
@@ -86,7 +76,11 @@ export async function POST(request: NextRequest) {
       weightGramsSnapshot: parsed.data.weightGramsSnapshot,
       currency: parsed.data.currency ?? "ARS",
     },
+    update: {
+      quantity: { increment: parsed.data.quantity },
+      unitPriceCents: parsed.data.unitPriceCents,
+    },
   });
 
-  return NextResponse.json(item, { status: 201 });
+  return NextResponse.json(item, { status: isNew ? 201 : 200 });
 }
