@@ -200,32 +200,6 @@ export const openapiSpec: OpenAPIV3.Document = {
     schemas,
   },
   paths: {
-    "/api/health": {
-      get: {
-        tags: ["Sistema"],
-        summary: "Health check",
-        description: "Verifica que el servidor y la base de datos estén operativos.",
-        responses: {
-          "200": {
-            description: "Servicio operativo",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    status: { type: "string", example: "ok" },
-                    db: { type: "string", example: "connected" },
-                    timestamp: { type: "string", format: "date-time" },
-                  },
-                },
-              },
-            },
-          },
-          "500": { description: "Base de datos desconectada" },
-        },
-      },
-    },
-
     "/api/products": {
       get: {
         tags: ["Productos"],
@@ -242,40 +216,9 @@ export const openapiSpec: OpenAPIV3.Document = {
           },
         },
       },
-      post: {
-        tags: ["Productos"],
-        summary: "Crear producto",
-        description: "Crea un nuevo producto en el catálogo.",
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                required: ["title", "description"],
-                properties: {
-                  title: { type: "string" },
-                  description: { type: "string" },
-                  price: { type: "number" },
-                  sellerId: { type: "string" },
-                  sellerName: { type: "string" },
-                  imageUrl: { type: "string" },
-                },
-              },
-            },
-          },
-        },
-        responses: {
-          "201": {
-            description: "Producto creado",
-            content: { "application/json": { schema: { $ref: "#/components/schemas/Product" } } },
-          },
-          "400": { description: "title o description faltantes" },
-        },
-      },
     },
 
-    "/api/buyer/profile": {
+    "/api/v1/buyer/profile": {
       get: {
         tags: ["Perfil"],
         summary: "Obtener perfil del comprador",
@@ -322,7 +265,7 @@ export const openapiSpec: OpenAPIV3.Document = {
       },
     },
 
-    "/api/buyer/addresses": {
+    "/api/v1/buyer/addresses": {
       get: {
         tags: ["Direcciones"],
         summary: "Listar direcciones",
@@ -373,7 +316,7 @@ export const openapiSpec: OpenAPIV3.Document = {
       },
     },
 
-    "/api/buyer/addresses/{addressId}": {
+    "/api/v1/buyer/addresses/{addressId}": {
       patch: {
         tags: ["Direcciones"],
         summary: "Actualizar dirección",
@@ -421,7 +364,7 @@ export const openapiSpec: OpenAPIV3.Document = {
       },
     },
 
-    "/api/buyer/cart": {
+    "/api/v1/buyer/cart": {
       get: {
         tags: ["Carrito"],
         summary: "Obtener carrito",
@@ -470,7 +413,7 @@ export const openapiSpec: OpenAPIV3.Document = {
       },
     },
 
-    "/api/buyer/cart/{itemId}": {
+    "/api/v1/buyer/cart/{itemId}": {
       patch: {
         tags: ["Carrito"],
         summary: "Actualizar cantidad de item",
@@ -511,7 +454,7 @@ export const openapiSpec: OpenAPIV3.Document = {
       },
     },
 
-    "/api/buyer/favorites": {
+    "/api/v1/buyer/favorites": {
       get: {
         tags: ["Favoritos"],
         summary: "Listar favoritos",
@@ -556,7 +499,7 @@ export const openapiSpec: OpenAPIV3.Document = {
       },
     },
 
-    "/api/buyer/favorites/{favoriteId}": {
+    "/api/v1/buyer/favorites/{favoriteId}": {
       delete: {
         tags: ["Favoritos"],
         summary: "Quitar de favoritos",
@@ -572,7 +515,7 @@ export const openapiSpec: OpenAPIV3.Document = {
       },
     },
 
-    "/api/buyer/orders": {
+    "/api/v1/buyer/orders": {
       get: {
         tags: ["Órdenes"],
         summary: "Listar órdenes",
@@ -588,7 +531,7 @@ export const openapiSpec: OpenAPIV3.Document = {
       },
     },
 
-    "/api/buyer/orders/{orderId}": {
+    "/api/v1/buyer/orders/{orderId}": {
       get: {
         tags: ["Órdenes"],
         summary: "Detalle de orden",
@@ -608,7 +551,7 @@ export const openapiSpec: OpenAPIV3.Document = {
       },
     },
 
-    "/api/buyer/checkout": {
+    "/api/v1/buyer/checkout": {
       post: {
         tags: ["Checkout"],
         summary: "Iniciar checkout",
