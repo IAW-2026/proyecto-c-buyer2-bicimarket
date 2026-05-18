@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Loader2, Pencil } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { useBuyerProfile, useUpdateBuyerProfile } from "@/hooks/use-buyer";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ export function ProfileForm() {
   const { user } = useUser();
   const { data: profile, isLoading } = useBuyerProfile();
   const updateProfile = useUpdateBuyerProfile();
+  const [isEditing, setIsEditing] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -39,6 +40,8 @@ export function ProfileForm() {
 
   const onSubmit = async (values: FormValues) => {
     await updateProfile.mutateAsync(values);
+    form.reset(values);
+    setIsEditing(false);
   };
 
   if (isLoading) {
@@ -48,43 +51,81 @@ export function ProfileForm() {
   return (
     <div className="rounded-xl border border-border/60 bg-card p-5 space-y-5">
       {/* Avatar + name header */}
-      <div className="flex items-center gap-3">
-        <div className="flex size-14 items-center justify-center rounded-full bg-muted text-base font-semibold">
-          {user?.firstName?.[0]}{user?.lastName?.[0]}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex size-14 items-center justify-center rounded-full bg-muted text-base font-semibold">
+            {user?.firstName?.[0]}{user?.lastName?.[0]}
+          </div>
+          <div>
+            <p className="font-semibold">{user?.firstName} {user?.lastName}</p>
+            <p className="text-xs text-muted-foreground">{user?.primaryEmailAddress?.emailAddress}</p>
+          </div>
         </div>
-        <div>
-          <p className="font-semibold">{user?.firstName} {user?.lastName}</p>
-          <p className="text-xs text-muted-foreground">{user?.primaryEmailAddress?.emailAddress}</p>
-        </div>
+        {!isEditing && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-muted-foreground"
+            onClick={() => setIsEditing(true)}
+          >
+            <Pencil className="size-3.5" />
+            Editar
+          </Button>
+        )}
       </div>
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2">
-        <div className="sm:col-span-2 grid gap-1">
-          <Label htmlFor="fullName">Nombre completo *</Label>
-          <Input id="fullName" {...form.register("fullName")} />
-          {form.formState.errors.fullName && (
-            <p className="text-xs text-destructive">{form.formState.errors.fullName.message}</p>
-          )}
+      {/* View mode */}
+      {!isEditing && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2 grid gap-1">
+            <Label>Nombre completo</Label>
+            <p className="text-sm">{form.getValues("fullName") || "—"}</p>
+          </div>
+          <div className="grid gap-1">
+            <Label>Teléfono</Label>
+            <p className="text-sm text-muted-foreground">{form.getValues("phone") || "—"}</p>
+          </div>
         </div>
+      )}
 
-        <div className="grid gap-1">
-          <Label htmlFor="phone">Teléfono</Label>
-          <Input id="phone" placeholder="+54 9 11 0000-0000" {...form.register("phone")} />
-        </div>
-
-        <div className="sm:col-span-2 flex items-center gap-2">
-          <Button type="submit" disabled={updateProfile.isPending} className="gap-1.5">
-            {updateProfile.isPending ? (
-              <><Loader2 className="size-4 animate-spin" /> Guardando...</>
-            ) : (
-              <><Check className="size-4" /> Guardar cambios</>
+      {/* Edit mode */}
+      {isEditing && (
+        <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2 grid gap-1">
+            <Label htmlFor="fullName">Nombre completo *</Label>
+            <Input id="fullName" {...form.register("fullName")} />
+            {form.formState.errors.fullName && (
+              <p className="text-xs text-destructive">{form.formState.errors.fullName.message}</p>
             )}
-          </Button>
-          <Button type="button" variant="ghost" onClick={() => form.reset()}>
-            Cancelar
-          </Button>
-        </div>
-      </form>
+          </div>
+
+          <div className="grid gap-1">
+            <Label htmlFor="phone">Teléfono</Label>
+            <Input id="phone" placeholder="+54 9 11 0000-0000" {...form.register("phone")} />
+          </div>
+
+          <div className="sm:col-span-2 flex items-center gap-2">
+            <Button type="submit" disabled={updateProfile.isPending || !form.formState.isDirty} className="gap-1.5">
+              {updateProfile.isPending ? (
+                <><Loader2 className="size-4 animate-spin" /> Guardando...</>
+              ) : (
+                <><Check className="size-4" /> Guardar cambios</>
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                form.reset({ fullName: profile?.fullName ?? "", phone: profile?.phone ?? "" });
+                setIsEditing(false);
+              }}
+            >
+              Cancelar
+            </Button>
+          </div>
+        </form>
+      )}
 
       {/* Account section */}
       <div className="border-t border-border/60 pt-4 space-y-3">

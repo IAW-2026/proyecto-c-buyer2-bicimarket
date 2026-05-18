@@ -1,7 +1,7 @@
 "use client";
 
 import { Heart } from "lucide-react";
-import { useFavoriteItems, useRemoveFavoriteItem } from "@/hooks/use-buyer";
+import { useFavoriteItems, useRemoveFavoriteItem, useProducts } from "@/hooks/use-buyer";
 import { FavoriteCard } from "@/components/favorites/favorite-card";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,6 +10,7 @@ import Link from "next/link";
 
 export default function FavoritesPage() {
   const { data: favorites, isLoading } = useFavoriteItems();
+  const { data: products } = useProducts();
   const removeFavorite = useRemoveFavoriteItem();
 
   if (isLoading) return <FavoritesSkeleton />;
@@ -42,6 +43,7 @@ export default function FavoritesPage() {
             <FavoriteCard
               key={item.id}
               item={item}
+              product={products?.find((p) => p.id === item.productId)}
               onRemove={(id) => removeFavorite.mutate(id)}
               isRemoving={removeFavorite.isPending}
             />
