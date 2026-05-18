@@ -50,7 +50,6 @@ export function FavoriteCard({
           variant="outline"
           size="sm"
           className="w-full gap-1.5 text-xs"
-          nativeButton={false}
           render={<a href={`/shop?product=${item.productId}`} />}
         >
           <ExternalLink className="size-3.5" />
