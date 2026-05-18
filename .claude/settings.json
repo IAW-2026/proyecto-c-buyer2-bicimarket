@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E \"^\\\\-.*\\\\.\\(env|json\\)$\")",
+      "Bash(npx prisma *)",
+      "Bash(xargs rm -f)",
+      "Bash(npx tsc *)"
+    ]
+  }
+}
