@@ -4,7 +4,9 @@
       "Bash(grep -E \"^\\\\-.*\\\\.\\(env|json\\)$\")",
       "Bash(npx prisma *)",
       "Bash(xargs rm -f)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(rm -rf node_modules/@next/swc-darwin-arm64)",
+      "Bash(npm install *)"
     ]
   }
 }

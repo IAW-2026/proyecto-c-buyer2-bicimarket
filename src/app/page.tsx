@@ -22,14 +22,6 @@ export default async function Home() {
           <span>Vendedores</span>
           <span>Ayuda</span>
         </nav>
-        <div className="flex items-center gap-2">
-          <Link href="/sign-in" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-            Iniciar sesión
-          </Link>
-          <Link href="/sign-up" className={buttonVariants({ size: "sm" })}>
-            Crear cuenta
-          </Link>
-        </div>
       </header>
 
       <main className="flex flex-1 flex-col">
