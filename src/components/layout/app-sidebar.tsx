@@ -12,23 +12,38 @@ import {
   User,
   Bike,
   LogOut,
+  Shield,
+  Users,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuBadge,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar";
 import { useBuyerCart } from "@/hooks/use-buyer";
 
-type NavItem = {
-  href: string;
-  label: string;
-  icon: React.ElementType;
-};
+type NavItem = { href: string; label: string; icon: React.ElementType };
 
 const navItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/shop", label: "Tienda", icon: Store },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/cart", label: "Carrito", icon: ShoppingCart },
   { href: "/orders", label: "Mis órdenes", icon: Package },
   { href: "/favorites", label: "Favoritos", icon: Heart },
-  { href: "/profile", label: "Perfil", icon: User },
+];
+
+const adminNavItems: NavItem[] = [
+  { href: "/admin", label: "Dashboard", icon: Shield },
+  { href: "/admin/orders", label: "Órdenes", icon: Package },
+  { href: "/admin/buyers", label: "Compradores", icon: Users },
+  { href: "/admin/carts", label: "Carritos", icon: ShoppingCart },
 ];
 
 export function AppSidebar() {
@@ -37,88 +52,103 @@ export function AppSidebar() {
   const { user } = useUser();
   const { data: cart } = useBuyerCart();
   const cartCount = cart?.itemCount ?? 0;
+  const isAdmin = !!user?.publicMetadata?.admin;
+  const initials = (user?.firstName?.[0] ?? "") + (user?.lastName?.[0] ?? "");
 
   return (
-    <aside className="flex h-screen w-[185px] shrink-0 flex-col bg-sidebar text-sidebar-foreground">
-      <div className="flex items-center gap-2 px-4 py-5">
-        <div className="flex size-8 items-center justify-center rounded-lg bg-sidebar-primary">
-          <Bike className="size-4 text-sidebar-primary-foreground" />
-        </div>
-        <span className="font-heading text-base font-semibold tracking-tight">
-          BiciMarket
-        </span>
-      </div>
+    <Sidebar variant="inset">
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" render={<Link href="/shop" />}>
+              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                <Bike className="size-4" />
+              </div>
+              <div className="grid flex-1 text-left text-sm leading-tight">
+                <span className="truncate font-semibold">BiciMarket</span>
+              </div>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
 
-      <nav className="flex-1 px-3 py-2">
-        <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
-          Comprar
-        </p>
-        <ul className="space-y-0.5">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.href}
-              item={item}
-              isActive={pathname === item.href || pathname.startsWith(`${item.href}/`)}
-              badge={item.href === "/cart" && cartCount > 0 ? cartCount : undefined}
-            />
-          ))}
-        </ul>
-      </nav>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Comprar</SidebarGroupLabel>
+          <SidebarMenu>
+            {navItems.map((item) => {
+              const isActive =
+                item.href === "/shop"
+                  ? pathname === "/shop"
+                  : pathname === item.href || pathname.startsWith(`${item.href}/`);
+              return (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    render={<Link href={item.href} />}
+                    isActive={isActive}
+                    tooltip={item.label}
+                  >
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </SidebarMenuButton>
+                  {item.href === "/cart" && cartCount > 0 && (
+                    <SidebarMenuBadge>{cartCount > 9 ? "9+" : cartCount}</SidebarMenuBadge>
+                  )}
+                </SidebarMenuItem>
+              );
+            })}
+          </SidebarMenu>
+        </SidebarGroup>
 
-      <div className="border-t border-sidebar-border px-3 py-4 space-y-3">
-        <div className="flex items-center gap-2 px-2">
-          <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-xs font-semibold text-sidebar-accent-foreground">
-            {user?.firstName?.[0]}
-            {user?.lastName?.[0]}
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Administración</SidebarGroupLabel>
+            <SidebarMenu>
+              {adminNavItems.map((item) => {
+                const isActive =
+                  item.href === "/admin"
+                    ? pathname === "/admin"
+                    : pathname === item.href || pathname.startsWith(`${item.href}/`);
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      render={<Link href={item.href} />}
+                      isActive={isActive}
+                      tooltip={item.label}
+                    >
+                      <item.icon />
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroup>
+        )}
+      </SidebarContent>
+
+      <SidebarFooter className="mt-auto flex flex-row " >
+        <Link href="/profile" className="w-full flex flex-row items-center gap-3 rounded-md p-2 text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-accent-foreground text-xs font-semibold">
+            {initials}
           </div>
-          <div className="min-w-0">
-            <p className="truncate text-xs font-medium leading-tight">
+          <div className="grid flex-1 min-w-0 text-left text-sm leading-tight">
+            <span className="truncate font-semibold">
               {user?.firstName} {user?.lastName}
-            </p>
-            <p className="truncate text-[10px] text-sidebar-foreground/50">
+            </span>
+            <span className="truncate text-xs text-sidebar-foreground/60">
               {user?.primaryEmailAddress?.emailAddress}
-            </p>
+            </span>
           </div>
-        </div>
-        <button
-          onClick={() => signOut({ redirectUrl: "/" })}
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-        >
-          <LogOut className="size-3.5" />
-          Cerrar sesión
-        </button>
-      </div>
-    </aside>
-  );
-}
-
-type NavLinkProps = {
-  item: NavItem;
-  isActive: boolean;
-  badge?: number;
-};
-
-function NavLink({ item, isActive, badge }: NavLinkProps) {
-  const Icon = item.icon;
-  return (
-    <li>
-      <Link
-        href={item.href}
-        className={cn(
-          "flex items-center gap-2.5 rounded-md px-2 py-2 text-sm transition-colors",
-          isActive
-            ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
-            : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-        )}
-      >
-        <Icon className="size-4 shrink-0" />
-        <span className="flex-1">{item.label}</span>
-        {badge !== undefined && (
-          <span className="flex size-5 items-center justify-center rounded-full bg-sidebar-primary-foreground/20 text-[10px] font-semibold text-sidebar-primary-foreground">
-            {badge > 9 ? "9+" : badge}
-          </span>
-        )}
-      </Link>
-    </li>
+          </Link>
+          <button
+            onClick={() => signOut({ redirectUrl: "/" })}
+            className="shrink-0 rounded-md p-1.5 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+            title="Cerrar sesión"
+          >
+            <LogOut className="size-4" />
+          </button>
+      </SidebarFooter>
+    </Sidebar>
   );
 }

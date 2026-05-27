@@ -6,7 +6,16 @@
       "Bash(xargs rm -f)",
       "Bash(npx tsc *)",
       "Bash(rm -rf node_modules/@next/swc-darwin-arm64)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(mkdir -p src/app/api/admin/orders/\\\\[orderId\\\\])",
+      "Bash(mkdir -p \"src/app/\\(admin\\)/orders/[orderId]\")",
+      "Bash(mkdir -p \"src/app/admin/orders/[orderId]\" \"src/app/admin/buyers\" \"src/app/admin/carts\")",
+      "Bash(cp \"src/app/\\(admin\\)/orders/[orderId]/page.tsx\" \"src/app/admin/orders/[orderId]/page.tsx\")",
+      "Bash(npm run *)"
+    ],
+    "additionalDirectories": [
+      "/Users/camilarojasfritz/Desktop/proyecto-c-buyer2-bicimarket/src/app/api/admin/orders",
+      "/Users/camilarojasfritz/Desktop/proyecto-c-buyer2-bicimarket/src/app/(admin)/orders"
     ]
   }
 }

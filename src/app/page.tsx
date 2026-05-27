@@ -6,7 +6,7 @@ import { Bike, ShoppingCart, Truck, CreditCard } from "lucide-react";
 
 export default async function Home() {
   const { userId } = await auth();
-  if (userId) redirect("/dashboard");
+  if (userId) redirect("/shop");
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
