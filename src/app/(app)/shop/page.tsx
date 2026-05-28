@@ -1,7 +1,7 @@
 "use client";
 
 import { Store } from "lucide-react";
-import { useProducts, useAddCartItem, useAddFavoriteItem, useFavoriteItems, useBuyerCart } from "@/hooks/use-buyer";
+import { useProducts, useAddCartItem, useAddFavoriteItem, useRemoveFavoriteItem, useFavoriteItems, useBuyerCart } from "@/hooks/use-buyer";
 import { useShopFilters } from "@/hooks/use-shop-filters";
 import { FilterPanel } from "@/components/shop/filter-panel";
 import { ProductCard } from "@/components/shop/product-card";
@@ -15,6 +15,7 @@ export default function ShopPage() {
   const { data: cart } = useBuyerCart();
   const addCartItem = useAddCartItem();
   const addFavoriteItem = useAddFavoriteItem();
+  const removeFavoriteItem = useRemoveFavoriteItem();
   const shopFilters = useShopFilters(products);
 
   const favoriteProductIds = new Set(favorites?.map((f) => f.productId) ?? []);
@@ -32,7 +33,12 @@ export default function ShopPage() {
   }
 
   async function handleToggleFavorite(product: Product) {
-    await addFavoriteItem.mutateAsync({ productId: product.id });
+    const existing = favorites?.find((f) => f.productId === product.id);
+    if (existing) {
+      await removeFavoriteItem.mutateAsync(existing.id);
+    } else {
+      await addFavoriteItem.mutateAsync({ productId: product.id });
+    }
   }
 
   return (
@@ -74,7 +80,7 @@ export default function ShopPage() {
                 isFavorite={favoriteProductIds.has(product.id)}
                 isInCart={cartProductIds.has(product.id)}
                 isAddingToCart={addCartItem.isPending}
-                isAddingFavorite={addFavoriteItem.isPending}
+                isAddingFavorite={addFavoriteItem.isPending || removeFavoriteItem.isPending}
                 onAddToCart={handleAddToCart}
                 onToggleFavorite={handleToggleFavorite}
               />
