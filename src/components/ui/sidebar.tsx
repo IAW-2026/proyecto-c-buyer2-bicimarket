@@ -5,7 +5,7 @@ import * as React from "react"
 import { mergeProps } from "@base-ui/react/merge-props"
 import { useRender } from "@base-ui/react/use-render"
 import { cva, type VariantProps } from "class-variance-authority"
-
+import Link from "next/link"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -18,6 +18,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import {Bike} from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -55,7 +56,7 @@ function useSidebar() {
 }
 
 function SidebarProvider({
-  defaultOpen = true,
+  defaultOpen = false,
   open: openProp,
   onOpenChange: setOpenProp,
   className,
@@ -260,6 +261,7 @@ function SidebarTrigger({
   const { toggleSidebar } = useSidebar()
 
   return (
+    <div className="flex items-center gap-2 rounded-md px-2 py-2 ">
     <Button
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
@@ -275,6 +277,17 @@ function SidebarTrigger({
       <PanelLeftIcon />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
+    <Separator orientation="vertical" className="mx-2" />
+     <Link href="/shop" className="flex flex-row  items-center justify-center gap-2" >
+              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                <Bike className="size-4" />
+              </div>
+              <div className="grid flex-1 text-left text-sm leading-tight">
+                <span className="truncate font-semibold">BiciMarket</span>
+              </div>
+            
+          </Link>
+    </div>
   )
 }
 

@@ -89,7 +89,7 @@ Owner: Camila Rojas Fritz. Clerk: `buyer.bicimarket`.
 
 ## B1. Perfil del comprador
 
-### `GET /api/v1/buyer-profile/me`
+### `GET /api/v1/buyer/profile`
 
 Devuelve el perfil propio.
 
@@ -110,9 +110,9 @@ Devuelve el perfil propio.
 }
 ```
 
-### `PUT /api/v1/buyer-profile/me`
+### `PATCH /api/v1/buyer/profile`
 
-Crea o actualiza el perfil. Idempotente.
+Actualiza el perfil del comprador.
 
 **Request**
 
@@ -141,7 +141,7 @@ Crea o actualiza el perfil. Idempotente.
 
 ## B2. Direcciones
 
-### `GET /api/v1/addresses`
+### `GET /api/v1/buyer/addresses`
 
 **Response 200**
 
@@ -165,7 +165,7 @@ Crea o actualiza el perfil. Idempotente.
 }
 ```
 
-### `POST /api/v1/addresses`
+### `POST /api/v1/buyer/addresses`
 
 **Request**
 
@@ -185,12 +185,12 @@ Crea o actualiza el perfil. Idempotente.
 
 **Response 201**: el address creado.
 
-### `PUT /api/v1/addresses/{addressId}`
+### `PATCH /api/v1/buyer/addresses/{addressId}`
 
 **Request**: idéntico al POST.
 **Response 200**: address actualizado.
 
-### `DELETE /api/v1/addresses/{addressId}`
+### `DELETE /api/v1/buyer/addresses/{addressId}`
 
 **Response 204** sin body.
 
@@ -198,7 +198,7 @@ Crea o actualiza el perfil. Idempotente.
 
 ## B3. Carrito
 
-### `GET /api/v1/cart`
+### `GET /api/v1/buyer/cart`
 
 Devuelve el carrito activo. Si no existe, lo crea vacío.
 
@@ -248,7 +248,7 @@ Devuelve el carrito activo. Si no existe, lo crea vacío.
 }
 ```
 
-### `POST /api/v1/cart/items`
+### `POST /api/v1/buyer/cart`
 
 **Request**
 
@@ -268,7 +268,7 @@ Buyer App llama internamente a `GET /api/v1/products/{id}/availability` en Selle
 - `404 PRODUCT_NOT_FOUND`
 - `409 PRODUCT_NOT_ACTIVE` si la publicación no está `active`
 
-### `PATCH /api/v1/cart/items/{itemId}`
+### `PATCH /api/v1/buyer/cart/{itemId}`
 
 **Request**
 
@@ -278,7 +278,7 @@ Buyer App llama internamente a `GET /api/v1/products/{id}/availability` en Selle
 
 **Response 200**: el cart_item actualizado.
 
-### `DELETE /api/v1/cart/items/{itemId}`
+### `DELETE /api/v1/buyer/cart/{itemId}`
 
 **Response 204**.
 
@@ -286,7 +286,7 @@ Buyer App llama internamente a `GET /api/v1/products/{id}/availability` en Selle
 
 ## B4. Favoritos
 
-### `GET /api/v1/favorites`
+### `GET /api/v1/buyer/favorites`
 
 **Response 200**
 
@@ -303,11 +303,11 @@ Buyer App llama internamente a `GET /api/v1/products/{id}/availability` en Selle
 }
 ```
 
-### `POST /api/v1/favorites`
+### `POST /api/v1/buyer/favorites`
 
 **Request**: `{ "product_id": "prd_01H…" }`. **Response 201**.
 
-### `DELETE /api/v1/favorites/{favoriteId}`
+### `DELETE /api/v1/buyer/favorites/{favoriteId}`
 
 **Response 204**.
 
@@ -315,7 +315,7 @@ Buyer App llama internamente a `GET /api/v1/products/{id}/availability` en Selle
 
 ## B5. Órdenes (fuente de verdad de `order_id`)
 
-### `POST /api/v1/orders`
+### `POST /api/v1/buyer/checkout`
 
 Crea la orden a partir del carrito + dirección + cotizaciones. **Idempotency-Key obligatorio.**
 
@@ -402,11 +402,11 @@ Crea la orden a partir del carrito + dirección + cotizaciones. **Idempotency-Ke
 - `409 QUOTE_EXPIRED` con `details: { quote_id, expires_at }`
 - `422 ADDRESS_INVALID`
 
-### `GET /api/v1/orders/{orderId}`
+### `GET /api/v1/buyer/orders/{orderId}`
 
 **Response 200**: misma forma que el POST.
 
-### `GET /api/v1/orders?buyerId={buyerId}&status=paid&page=1&limit=20`
+### `GET /api/v1/buyer/orders`
 
 **Response 200**
 
@@ -426,7 +426,7 @@ Crea la orden a partir del carrito + dirección + cotizaciones. **Idempotency-Ke
 }
 ```
 
-### `PATCH /api/v1/orders/{orderId}/status` (server-to-server)
+### `PATCH /api/v1/orders/{orderId}` (server-to-server)
 
 Lo llama Payments App. Requiere `X-Service-Token`.
 
@@ -464,7 +464,7 @@ Lo llama Shipping App.
 
 **Response 200**: el seller_group actualizado.
 
-### `POST /api/v1/orders/{orderId}/cancel`
+### `POST /api/v1/buyer/orders/{orderId}/cancel`
 
 Solo si `status=pending_payment`.
 
