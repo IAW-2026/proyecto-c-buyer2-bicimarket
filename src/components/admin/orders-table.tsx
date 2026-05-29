@@ -47,6 +47,7 @@ export function OrdersTable({ statusFilter }: { statusFilter?: OrderStatus }) {
   const [orders, setOrders] = useState<OrderRow[] | null>(null);
 
   useEffect(() => {
+    setOrders(null);
     const url = statusFilter ? `/api/admin/orders?status=${statusFilter}` : "/api/admin/orders";
     fetch(url)
       .then((r) => r.json())
@@ -80,15 +81,14 @@ export function OrdersTable({ statusFilter }: { statusFilter?: OrderStatus }) {
             <th className="px-4 py-3 text-right font-medium">Total</th>
             <th className="px-4 py-3 text-right font-medium">Items</th>
             <th className="px-4 py-3 text-left font-medium">Fecha</th>
+            <th className="px-4 py-3 text-left font-medium">Acciones</th>
           </tr>
         </thead>
         <tbody>
           {orders.map((order) => (
             <tr key={order.id} className="border-b border-border/40 last:border-0 hover:bg-muted/30 transition-colors">
               <td className="px-4 py-3 font-mono text-xs">
-                <Link href={`/admin/orders/${order.id}`} className="text-primary hover:underline">
-                  {order.id.slice(0, 8)}…
-                </Link>
+                {order.id.slice(0, 8)}…
               </td>
               <td className="px-4 py-3">
                 <p className="font-medium leading-tight">{order.buyerProfile.fullName}</p>
@@ -103,6 +103,14 @@ export function OrdersTable({ statusFilter }: { statusFilter?: OrderStatus }) {
               <td className="px-4 py-3 text-right text-muted-foreground">{order._count.items}</td>
               <td className="px-4 py-3 text-xs text-muted-foreground">
                 {new Date(order.createdAt).toLocaleDateString("es-AR")}
+              </td>
+              <td className="px-4 py-3">
+                <Link
+                  href={`/admin/orders/${order.id}`}
+                  className="rounded-lg border border-border px-3 py-1 text-xs font-medium hover:bg-muted transition-colors"
+                >
+                  Ver detalle
+                </Link>
               </td>
             </tr>
           ))}
