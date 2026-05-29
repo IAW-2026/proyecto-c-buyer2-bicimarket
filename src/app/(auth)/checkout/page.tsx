@@ -6,7 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRouter } from "next/navigation";
 import { CreditCard, Loader2, MapPin } from "lucide-react";
-import { useBuyerAddresses, useBuyerCart, useCheckoutCart } from "@/hooks/use-buyer";
+import { useBuyerAddresses, useBuyerCart } from "@/hooks/use-buyer";
+import { useCheckoutMutations } from "@/hooks/querys/checkout/useCheckoutMutations";
 import { useCartStore } from "@/store/use-cart-store";
 import { AddressSelector } from "@/components/checkout/address-selector";
 import { SellerGroupPreview, groupCartItemsBySeller } from "@/components/checkout/seller-group-preview";
@@ -26,7 +27,7 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { data: cart, isLoading: cartLoading } = useBuyerCart();
   const { data: addresses, isLoading: addressesLoading } = useBuyerAddresses();
-  const checkout = useCheckoutCart();
+  const { checkout } = useCheckoutMutations();
   const selectedAddressId = useCartStore((s) => s.selectedAddressId);
   const setSelectedAddressId = useCartStore((s) => s.setSelectedAddressId);
 

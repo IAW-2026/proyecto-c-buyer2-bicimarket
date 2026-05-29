@@ -1,7 +1,8 @@
 "use client";
 
 import { ShoppingCart } from "lucide-react";
-import { useBuyerCart, useRemoveCartItem, useUpdateCartItem } from "@/hooks/use-buyer";
+import { useBuyerCart } from "@/hooks/use-buyer";
+import { useCartMutations } from "@/hooks/querys/cart/useCartMutations";
 import { CartItemRow } from "@/components/cart/cart-item-row";
 import { CartSummaryPanel } from "@/components/cart/cart-summary-panel";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -11,8 +12,7 @@ import Link from "next/link";
 
 export default function CartPage() {
   const { data: cart, isLoading } = useBuyerCart();
-  const updateCartItem = useUpdateCartItem();
-  const removeCartItem = useRemoveCartItem();
+  const { updateItem: updateCartItem, removeItem: removeCartItem } = useCartMutations();
 
   const isMutating = updateCartItem.isPending || removeCartItem.isPending;
 

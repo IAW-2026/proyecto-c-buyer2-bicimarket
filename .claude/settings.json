@@ -18,13 +18,25 @@
       "Bash(node -e \"const m = require\\('/Users/camilarojasfritz/Desktop/proyecto-c-buyer2-bicimarket/node_modules/@xyflow/react/dist/umd/index.js'\\); console.log\\(Object.keys\\(m\\).filter\\(k => ['ReactFlow','Handle','Position','NodeTypes','useNodesState','useEdgesState','Background','MarkerType'].includes\\(k\\)\\)\\)\")",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/orders)",
-      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")"
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(ls -la /Users/camilarojasfritz/Desktop/)",
+      "Read(//Users/camilarojasfritz/Desktop/**)",
+      "Bash(npx tsx *)",
+      "Bash(node -e \"const c = require\\('@clerk/nextjs'\\); console.log\\(Object.keys\\(c\\).filter\\(k => k.toLowerCase\\(\\).includes\\('sign'\\) || k.toLowerCase\\(\\).includes\\('user'\\) || k.toLowerCase\\(\\).includes\\('auth'\\)\\).join\\('\\\\n'\\)\\)\")",
+      "Bash(node -e \"const l = require\\('/Users/camilarojasfritz/Desktop/proyecto-c-buyer2-bicimarket/node_modules/lucide-react'\\); console.log\\('LayoutDashboard:', typeof l.LayoutDashboard\\); console.log\\('Bike:', typeof l.Bike\\);\")",
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
+      "Bash(grep -v \"^$\")",
+      "Bash(xargs ls)",
+      "Bash(mkdir -p \"src/app/\\(auth\\)/cart\" \"src/app/\\(auth\\)/checkout\" \"src/app/\\(auth\\)/dashboard\" \"src/app/\\(auth\\)/favorites\" \"src/app/\\(auth\\)/orders/[orderId]\" \"src/app/\\(auth\\)/profile\")",
+      "Bash(mv \"src/app/\\(app\\)/cart/page.tsx\" \"src/app/\\(auth\\)/cart/page.tsx\" && mv \"src/app/\\(app\\)/checkout/page.tsx\" \"src/app/\\(auth\\)/checkout/page.tsx\" && mv \"src/app/\\(app\\)/dashboard/page.tsx\" \"src/app/\\(auth\\)/dashboard/page.tsx\" && mv \"src/app/\\(app\\)/favorites/page.tsx\" \"src/app/\\(auth\\)/favorites/page.tsx\" && mv \"src/app/\\(app\\)/orders/page.tsx\" \"src/app/\\(auth\\)/orders/page.tsx\" && mv \"src/app/\\(app\\)/orders/[orderId]/page.tsx\" \"src/app/\\(auth\\)/orders/[orderId]/page.tsx\" && mv \"src/app/\\(app\\)/profile/page.tsx\" \"src/app/\\(auth\\)/profile/page.tsx\")"
     ],
     "additionalDirectories": [
       "/Users/camilarojasfritz/Desktop/proyecto-c-buyer2-bicimarket/src/app/api/admin/orders",
       "/Users/camilarojasfritz/Desktop/proyecto-c-buyer2-bicimarket/src/app/(admin)/orders",
       "/Users/camilarojasfritz/Desktop/proyecto-c-buyer2-bicimarket/src/app/api/products",
-      "/Users/camilarojasfritz/Desktop/proyecto-c-buyer2-bicimarket/src/app/(app)/shop"
+      "/Users/camilarojasfritz/Desktop/proyecto-c-buyer2-bicimarket/src/app/(app)/shop",
+      "/Users/camilarojasfritz/Desktop/proyecto-c-buyer2-bicimarket/src/app/(auth)/orders",
+      "/Users/camilarojasfritz/Desktop/proyecto-c-buyer2-bicimarket/src/app/(app)/orders/[orderId]"
     ]
   }
 }

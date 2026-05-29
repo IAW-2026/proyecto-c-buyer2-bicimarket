@@ -5,7 +5,8 @@ import { Plus, Trash2, MapPin } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useBuyerAddresses, useCreateAddress, useDeleteAddress } from "@/hooks/use-buyer";
+import { useBuyerAddresses } from "@/hooks/use-buyer";
+import { useAddressMutations } from "@/hooks/querys/addresses/useAddressMutations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,8 +28,7 @@ type AddressFormValues = z.infer<typeof addressSchema>;
 
 export function AddressList() {
   const { data: addresses, isLoading } = useBuyerAddresses();
-  const createAddress = useCreateAddress();
-  const deleteAddress = useDeleteAddress();
+  const { create: createAddress, remove: deleteAddress } = useAddressMutations();
   const [showForm, setShowForm] = useState(false);
 
   const form = useForm<AddressFormValues>({

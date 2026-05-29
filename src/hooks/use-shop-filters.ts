@@ -1,24 +1,36 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import type { Product } from "@/types/buyer";
-
-type ShopFilters = {
-  minPrice: number;
-  maxPrice: number;
-  onlyInStock: boolean;
-  selectedSellers: string[];
-};
-
-const DEFAULT_FILTERS: ShopFilters = {
-  minPrice: 0,
-  maxPrice: 10_000_000,
-  onlyInStock: false,
-  selectedSellers: [],
-};
+import { matchesCategory } from "@/lib/categories";
 
 export function useShopFilters(products: Product[] | undefined) {
-  const [filters, setFilters] = useState<ShopFilters>(DEFAULT_FILTERS);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const searchQuery = searchParams.get("q") ?? "";
+  const category = searchParams.get("category") ?? "";
+  const onlyInStock = searchParams.get("stock") === "1";
+  const selectedSellers = searchParams.get("sellers")?.split(",").filter(Boolean) ?? [];
+  const minPrice = Number(searchParams.get("minPrice") ?? 0);
+  const maxPrice = Number(searchParams.get("maxPrice") ?? 10_000_000);
+
+  const filters = { searchQuery, category, onlyInStock, selectedSellers, minPrice, maxPrice };
+
+  function updateParams(updates: Record<string, string | null>) {
+    const params = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === null || value === "") {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+    }
+    const qs = params.toString();
+    router.replace(`${pathname}${qs ? `?${qs}` : ""}`);
+  }
 
   const availableSellers = useMemo(() => {
     if (!products) return [];
@@ -42,36 +54,51 @@ export function useShopFilters(products: Product[] | undefined) {
     if (!products) return [];
     return products.filter((p) => {
       const price = p.price ?? 0;
-      if (price < filters.minPrice || price > filters.maxPrice) return false;
-      if (filters.onlyInStock && !p.isActive) return false;
-      if (
-        filters.selectedSellers.length > 0 &&
-        !filters.selectedSellers.includes(p.sellerId ?? "unknown")
-      )
+      if (price < minPrice || price > maxPrice) return false;
+      if (onlyInStock && !p.isActive) return false;
+      if (selectedSellers.length > 0 && !selectedSellers.includes(p.sellerId ?? "unknown"))
         return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const haystack = `${p.title} ${p.description ?? ""} ${p.sellerName ?? ""}`.toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      if (category && !matchesCategory(p, category)) return false;
       return true;
     });
-  }, [products, filters]);
+  }, [products, minPrice, maxPrice, onlyInStock, selectedSellers, searchQuery, category]);
+
+  function setSearchQuery(value: string) {
+    updateParams({ q: value || null });
+  }
+
+  function setCategory(value: string) {
+    updateParams({ category: value || null });
+  }
 
   function setOnlyInStock(value: boolean) {
-    setFilters((prev) => ({ ...prev, onlyInStock: value }));
+    updateParams({ stock: value ? "1" : null });
   }
 
   function toggleSeller(sellerId: string) {
-    setFilters((prev) => ({
-      ...prev,
-      selectedSellers: prev.selectedSellers.includes(sellerId)
-        ? prev.selectedSellers.filter((id) => id !== sellerId)
-        : [...prev.selectedSellers, sellerId],
-    }));
+    const next = selectedSellers.includes(sellerId)
+      ? selectedSellers.filter((id) => id !== sellerId)
+      : [...selectedSellers, sellerId];
+    updateParams({ sellers: next.length ? next.join(",") : null });
   }
 
   function setPriceRange(min: number, max: number) {
-    setFilters((prev) => ({ ...prev, minPrice: min, maxPrice: max }));
+    updateParams({
+      minPrice: min > priceRange.min ? String(min) : null,
+      maxPrice: max < priceRange.max ? String(max) : null,
+    });
   }
 
   function clearFilters() {
-    setFilters(DEFAULT_FILTERS);
+    const params = new URLSearchParams();
+    if (searchQuery) params.set("q", searchQuery);
+    const qs = params.toString();
+    router.replace(`${pathname}${qs ? `?${qs}` : ""}`);
   }
 
   return {
@@ -82,6 +109,8 @@ export function useShopFilters(products: Product[] | undefined) {
     setOnlyInStock,
     toggleSeller,
     setPriceRange,
+    setSearchQuery,
+    setCategory,
     clearFilters,
   };
 }

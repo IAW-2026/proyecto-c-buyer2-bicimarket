@@ -5,6 +5,7 @@ import { QueryProvider } from "@/providers/query-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
+import { ShopHeader } from "@/components/shop/shop-header";
 
 const instrumentSans = Instrument_Sans({
   variable: "--font-heading",
@@ -39,6 +40,7 @@ export default function RootLayout({
         className={`${ibmPlexSans.variable} ${instrumentSans.variable} ${jetbrainsMono.variable} h-full antialiased`}
       >
         <body className="min-h-full flex flex-col">
+          <ShopHeader />
           <QueryProvider>
             <TooltipProvider>
               {children}

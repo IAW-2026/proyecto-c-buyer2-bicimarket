@@ -1,7 +1,10 @@
 "use client";
 
-import { Store } from "lucide-react";
-import { useProducts, useAddCartItem, useAddFavoriteItem, useRemoveFavoriteItem, useFavoriteItems, useBuyerCart } from "@/hooks/use-buyer";
+import { Suspense } from "react";
+import { Store, SlidersHorizontal } from "lucide-react";
+import { useProducts, useFavoriteItems, useBuyerCart } from "@/hooks/use-buyer";
+import { useCartMutations } from "@/hooks/querys/cart/useCartMutations";
+import { useFavoriteMutations } from "@/hooks/querys/favorites/useFavoriteMutations";
 import { useShopFilters } from "@/hooks/use-shop-filters";
 import { FilterPanel } from "@/components/shop/filter-panel";
 import { ProductCard } from "@/components/shop/product-card";
@@ -9,13 +12,12 @@ import { ProductGridSkeleton } from "@/components/shop/product-grid-skeleton";
 import { EmptyState } from "@/components/shared/empty-state";
 import type { Product } from "@/types/buyer";
 
-export default function ShopPage() {
+function ShopContent() {
   const { data: products, isLoading } = useProducts();
   const { data: favorites } = useFavoriteItems();
   const { data: cart } = useBuyerCart();
-  const addCartItem = useAddCartItem();
-  const addFavoriteItem = useAddFavoriteItem();
-  const removeFavoriteItem = useRemoveFavoriteItem();
+  const { addItem: addCartItem } = useCartMutations();
+  const { addItem: addFavoriteItem, removeItem: removeFavoriteItem } = useFavoriteMutations();
   const shopFilters = useShopFilters(products);
 
   const favoriteProductIds = new Set(favorites?.map((f) => f.productId) ?? []);
@@ -41,24 +43,39 @@ export default function ShopPage() {
     }
   }
 
-  return (
-    <div className="flex min-h-full flex-col gap-0 lg:flex-row">
-      {/* Filter panel */}
-      <div className="w-full border-b border-border/60 px-6 py-5 lg:w-56 lg:shrink-0 lg:border-b-0 lg:border-r lg:py-8">
-        <FilterPanel filters={shopFilters} />
-      </div>
+  const activeCategory = shopFilters.filters.category;
+  const activeSearch = shopFilters.filters.searchQuery;
 
-      {/* Main content */}
+  return (
+    <div className="flex min-h-full flex-col lg:flex-row">
+      {/* Filter panel */}
+      <aside className="w-full border-b border-border/60 px-6 py-5 lg:w-60 lg:shrink-0 lg:border-b-0 lg:border-r lg:py-8">
+        <div className="flex items-center gap-2 mb-4">
+          <SlidersHorizontal className="size-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold">Filtros</h2>
+        </div>
+        <FilterPanel filters={shopFilters} />
+      </aside>
+
+      {/* Main grid */}
       <div className="flex-1 px-6 py-8">
-        <div className="mb-5 flex items-center justify-between">
-          <div>
-            <h1 className="font-heading text-2xl font-bold tracking-tight">Tienda</h1>
-            {!isLoading && (
-              <p className="text-xs text-muted-foreground">
-                {shopFilters.filtered.length} productos
-              </p>
-            )}
-          </div>
+        <div className="mb-6">
+          <h1 className="font-heading text-2xl font-bold tracking-tight">
+            {activeCategory
+              ? shopFilters.availableSellers.length > 0
+                ? activeCategory.charAt(0).toUpperCase() + activeCategory.slice(1)
+                : "Tienda"
+              : "Tienda"}
+          </h1>
+          {!isLoading && (
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {shopFilters.filtered.length}{" "}
+              {shopFilters.filtered.length === 1 ? "producto" : "productos"}
+              {activeSearch && (
+                <span> para &ldquo;{activeSearch}&rdquo;</span>
+              )}
+            </p>
+          )}
         </div>
 
         {isLoading && <ProductGridSkeleton />}
@@ -72,7 +89,7 @@ export default function ShopPage() {
         )}
 
         {!isLoading && shopFilters.filtered.length > 0 && (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {shopFilters.filtered.map((product) => (
               <ProductCard
                 key={product.id}
@@ -80,7 +97,9 @@ export default function ShopPage() {
                 isFavorite={favoriteProductIds.has(product.id)}
                 isInCart={cartProductIds.has(product.id)}
                 isAddingToCart={addCartItem.isPending}
-                isAddingFavorite={addFavoriteItem.isPending || removeFavoriteItem.isPending}
+                isAddingFavorite={
+                  addFavoriteItem.isPending || removeFavoriteItem.isPending
+                }
                 onAddToCart={handleAddToCart}
                 onToggleFavorite={handleToggleFavorite}
               />
@@ -89,5 +108,13 @@ export default function ShopPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ShopPage() {
+  return (
+    <Suspense fallback={<ProductGridSkeleton />}>
+      <ShopContent />
+    </Suspense>
   );
 }

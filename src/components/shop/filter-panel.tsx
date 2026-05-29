@@ -4,6 +4,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import { formatPrice } from "@/components/shared/price-display";
 import type { useShopFilters } from "@/hooks/use-shop-filters";
 
@@ -24,11 +25,20 @@ export function FilterPanel({ filters }: FilterPanelProps) {
       </div>
 
       {/* Price range */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         <p className="text-xs font-medium text-muted-foreground">Rango de precio</p>
+        <Slider
+          value={[
+            Math.max(filters.filters.minPrice, filters.priceRange.min),
+            Math.min(filters.filters.maxPrice, filters.priceRange.max),
+          ]}
+          min={filters.priceRange.min}
+          max={filters.priceRange.max}
+          onValueChange={(val: number[]) => filters.setPriceRange(val[0], val[1])}
+        />
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>{formatPrice(filters.priceRange.min)}</span>
-          <span>{formatPrice(filters.priceRange.max)}</span>
+          <span>{formatPrice(filters.filters.minPrice)}</span>
+          <span>{formatPrice(filters.filters.maxPrice)}</span>
         </div>
       </div>
 

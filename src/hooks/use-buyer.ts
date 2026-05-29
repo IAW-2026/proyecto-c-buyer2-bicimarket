@@ -1,16 +1,18 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@clerk/nextjs";
 import { api } from "@/lib/axios";
 import type {
   Address,
   BuyerProfile,
   Cart,
-  CartItem,
   FavoriteItem,
   Order,
   Product,
 } from "@/types/buyer";
+
+// ─── Perfil ───────────────────────────────────────────────────────────────────
 
 export function useBuyerProfile() {
   return useQuery<BuyerProfile>({
@@ -22,18 +24,7 @@ export function useBuyerProfile() {
   });
 }
 
-export function useUpdateBuyerProfile() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (payload: Partial<BuyerProfile>) => {
-      const { data } = await api.patch<BuyerProfile>("/v1/buyer/profile", payload);
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["buyer-profile"] });
-    },
-  });
-}
+// ─── Direcciones ──────────────────────────────────────────────────────────────
 
 export function useBuyerAddresses() {
   return useQuery<Address[]>({
@@ -45,127 +36,35 @@ export function useBuyerAddresses() {
   });
 }
 
-export function useCreateAddress() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (
-      address: Omit<Address, "id" | "buyerProfileId" | "createdAt" | "updatedAt">,
-    ) => {
-      const { data } = await api.post<Address>("/v1/buyer/addresses", address);
-      return data;
-    },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["buyer-addresses"] }),
-  });
-}
-
-export function useDeleteAddress() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (addressId: string) => {
-      await api.delete(`/v1/buyer/addresses/${addressId}`);
-    },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["buyer-addresses"] }),
-  });
-}
+// ─── Carrito ──────────────────────────────────────────────────────────────────
 
 export function useBuyerCart() {
+  const { isSignedIn } = useAuth();
   return useQuery<Cart>({
     queryKey: ["buyer-cart"],
     queryFn: async () => {
       const { data } = await api.get<Cart>("/v1/buyer/cart");
       return data;
     },
+    enabled: !!isSignedIn,
   });
 }
 
-export function useAddCartItem() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (payload: {
-      productId: string;
-      sellerProfileId: string;
-      productNameSnapshot: string;
-      unitPriceCents: number;
-      quantity: number;
-      weightGramsSnapshot: number;
-      currency?: string;
-    }) => {
-      const { data } = await api.post<CartItem>("/v1/buyer/cart", payload);
-      return data;
-    },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["buyer-cart"] }),
-  });
-}
-
-export function useUpdateCartItem() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({
-      itemId,
-      quantity,
-    }: {
-      itemId: string;
-      quantity: number;
-    }) => {
-      const { data } = await api.patch<CartItem>(`/v1/buyer/cart/${itemId}`, {
-        quantity,
-      });
-      return data;
-    },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["buyer-cart"] }),
-  });
-}
-
-export function useRemoveCartItem() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (itemId: string) => {
-      await api.delete(`/v1/buyer/cart/${itemId}`);
-    },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["buyer-cart"] }),
-  });
-}
+// ─── Favoritos ────────────────────────────────────────────────────────────────
 
 export function useFavoriteItems() {
+  const { isSignedIn } = useAuth();
   return useQuery<FavoriteItem[]>({
     queryKey: ["favorite-items"],
     queryFn: async () => {
       const { data } = await api.get<FavoriteItem[]>("/v1/buyer/favorites");
       return data;
     },
+    enabled: !!isSignedIn,
   });
 }
 
-export function useAddFavoriteItem() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (payload: { productId: string }) => {
-      const { data } = await api.post<FavoriteItem>(
-        "/v1/buyer/favorites",
-        payload,
-      );
-      return data;
-    },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["favorite-items"] }),
-  });
-}
-
-export function useRemoveFavoriteItem() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (favoriteId: string) => {
-      await api.delete(`/v1/buyer/favorites/${favoriteId}`);
-    },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["favorite-items"] }),
-  });
-}
+// ─── Órdenes ──────────────────────────────────────────────────────────────────
 
 export function useBuyerOrders() {
   return useQuery<Order[]>({
@@ -188,25 +87,7 @@ export function useBuyerOrder(orderId: string) {
   });
 }
 
-export function useCheckoutCart() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (payload: {
-      shippingAddressId: string;
-      returnUrl: string;
-    }) => {
-      const { data } = await api.post<{ paymentUrl: string; orderId: string }>(
-        "/v1/buyer/checkout",
-        payload,
-      );
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["buyer-cart"] });
-      queryClient.invalidateQueries({ queryKey: ["buyer-orders"] });
-    },
-  });
-}
+// ─── Productos (público) ──────────────────────────────────────────────────────
 
 export function useProducts() {
   return useQuery<Product[]>({
@@ -227,4 +108,3 @@ export function useProduct(productId: string) {
     },
   });
 }
-

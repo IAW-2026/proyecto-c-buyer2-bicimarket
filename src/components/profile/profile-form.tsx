@@ -6,7 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Check, Loader2, Pencil } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
-import { useBuyerProfile, useUpdateBuyerProfile } from "@/hooks/use-buyer";
+import { useBuyerProfile } from "@/hooks/use-buyer";
+import { useProfileMutations } from "@/hooks/querys/profile/useProfileMutations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +22,7 @@ type FormValues = z.infer<typeof schema>;
 export function ProfileForm() {
   const { user } = useUser();
   const { data: profile, isLoading } = useBuyerProfile();
-  const updateProfile = useUpdateBuyerProfile();
+  const { update: updateProfile } = useProfileMutations();
   const [isEditing, setIsEditing] = useState(false);
 
   const form = useForm<FormValues>({
