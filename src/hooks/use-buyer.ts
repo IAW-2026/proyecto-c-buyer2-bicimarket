@@ -218,3 +218,13 @@ export function useProducts() {
   });
 }
 
+export function useProduct(productId: string) {
+  return useQuery<Product>({
+    queryKey: ["products", productId],
+    queryFn: async () => {
+      const { data } = await api.get<Product>(`/products/${productId}`);
+      return data;
+    },
+  });
+}
+

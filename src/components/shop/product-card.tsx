@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Heart, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProductImage } from "@/components/shared/product-image";
@@ -26,7 +27,10 @@ export function ProductCard({
   onToggleFavorite,
 }: ProductCardProps) {
   return (
-    <div className="flex flex-col overflow-hidden rounded-xl border border-border/60 bg-card">
+    <Link
+      href={`/shop/${product.id}`}
+      className="flex flex-col overflow-hidden rounded-xl border border-border/60 bg-card transition-shadow hover:shadow-md"
+    >
       <div className="relative">
         <ProductImage
           src={product.imageUrl}
@@ -35,7 +39,7 @@ export function ProductCard({
           className="w-full rounded-none"
         />
         <button
-          onClick={() => onToggleFavorite(product)}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(product); }}
           disabled={isAddingFavorite}
           className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-background/80 backdrop-blur-sm transition-colors hover:bg-background"
         >
@@ -70,7 +74,7 @@ export function ProductCard({
             <Button
               size="sm"
               className="h-8 gap-1.5 text-xs"
-              onClick={() => onAddToCart(product)}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAddToCart(product); }}
               disabled={isAddingToCart}
             >
               <ShoppingCart className="size-3.5" />
@@ -79,6 +83,6 @@ export function ProductCard({
           )}
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

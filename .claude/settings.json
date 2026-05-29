@@ -11,11 +11,20 @@
       "Bash(mkdir -p \"src/app/\\(admin\\)/orders/[orderId]\")",
       "Bash(mkdir -p \"src/app/admin/orders/[orderId]\" \"src/app/admin/buyers\" \"src/app/admin/carts\")",
       "Bash(cp \"src/app/\\(admin\\)/orders/[orderId]/page.tsx\" \"src/app/admin/orders/[orderId]/page.tsx\")",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(mkdir -p \"/Users/camilarojasfritz/Desktop/proyecto-c-buyer2-bicimarket/src/app/api/products/[productId]\")",
+      "Bash(mkdir -p \"/Users/camilarojasfritz/Desktop/proyecto-c-buyer2-bicimarket/src/app/\\(app\\)/shop/[productId]\")",
+      "Bash(node -e \"const p = require\\('/Users/camilarojasfritz/Desktop/proyecto-c-buyer2-bicimarket/node_modules/@xyflow/react/package.json'\\); console.log\\(p.version\\)\")",
+      "Bash(node -e \"const m = require\\('/Users/camilarojasfritz/Desktop/proyecto-c-buyer2-bicimarket/node_modules/@xyflow/react/dist/umd/index.js'\\); console.log\\(Object.keys\\(m\\).filter\\(k => ['ReactFlow','Handle','Position','NodeTypes','useNodesState','useEdgesState','Background','MarkerType'].includes\\(k\\)\\)\\)\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/orders)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")"
     ],
     "additionalDirectories": [
       "/Users/camilarojasfritz/Desktop/proyecto-c-buyer2-bicimarket/src/app/api/admin/orders",
-      "/Users/camilarojasfritz/Desktop/proyecto-c-buyer2-bicimarket/src/app/(admin)/orders"
+      "/Users/camilarojasfritz/Desktop/proyecto-c-buyer2-bicimarket/src/app/(admin)/orders",
+      "/Users/camilarojasfritz/Desktop/proyecto-c-buyer2-bicimarket/src/app/api/products",
+      "/Users/camilarojasfritz/Desktop/proyecto-c-buyer2-bicimarket/src/app/(app)/shop"
     ]
   }
 }
