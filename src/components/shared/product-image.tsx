@@ -19,7 +19,7 @@ export function ProductImage({ src, alt, className, size = "md" }: ProductImageP
   if (src) {
     return (
       <div className={cn("relative overflow-hidden rounded-md bg-muted", sizeClasses[size], className)}>
-        <Image src={src} alt={alt} fill className="object-cover" />
+        <Image src={src} alt={alt} fill unoptimized className="object-cover" />
       </div>
     );
   }
