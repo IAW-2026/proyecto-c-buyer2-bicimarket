@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Shield } from "lucide-react";
+import { Shield, House } from "lucide-react";
 import { useUser, useClerk } from "@clerk/nextjs";
+import { usePathname } from "next/navigation";
 import { useRole } from "@/hooks/use-role";
 import { buttonVariants } from "@/components/ui/button";
 
@@ -10,6 +11,7 @@ export function UserToggle() {
   const role = useRole();
   const { user } = useUser();
   const { signOut } = useClerk();
+  const pathname = usePathname();
 
   if (role === "public") {
     return (
@@ -36,13 +38,23 @@ export function UserToggle() {
   return (
     <div className="flex items-center gap-2">
       {role === "admin" && (
-        <Link
-          href="/admin"
-          className={buttonVariants({ variant: "outline", size: "sm" })}
-        >
-          <Shield className="size-3.5" />
-          Admin
-        </Link>
+        pathname.startsWith("/admin") ? (
+          <Link
+            href="/"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            <House className="size-3.5" />
+            Volver
+          </Link>
+        ) : (
+          <Link
+            href="/admin"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            <Shield className="size-3.5" />
+            Admin
+          </Link>
+        )
       )}
 
       <div className="flex items-center gap-2">
