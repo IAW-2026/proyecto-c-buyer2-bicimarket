@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
-import { Bike, Search, Heart, ShoppingCart } from "lucide-react";
+import { Bike, Search, Heart, Package, ShoppingCart } from "lucide-react";
 import { UserToggle } from "@/components/header/user-toggle";
 import { useRole } from "@/hooks/use-role";
 import { HEADER_CATEGORIES } from "@/lib/categories";
@@ -59,6 +59,12 @@ export function ShopHeader() {
   const isShopRoute =
     pathname === "/" || pathname === "/shop" || pathname.startsWith("/shop/");
 
+  const showIcons =
+    isShopRoute ||
+    pathname === "/favorites" ||
+    pathname === "/orders" ||
+    pathname === "/cart";
+
   const showCategories = pathname === "/" || pathname === "/shop";
 
   function handleIconNav(href: string) {
@@ -95,16 +101,16 @@ export function ShopHeader() {
           ))}
         </nav>
 
-        {/* Search bar — centered, only on shop routes */}
-        {isShopRoute && (
+        {/* Search bar — visible for all buyer routes, hidden in admin */}
+        {!pathname.startsWith("/admin") && (
           <Suspense fallback={<div className="mx-auto flex-1 lg:max-w-xl h-9" />}>
             <SearchForm />
           </Suspense>
         )}
 
         {/* Right actions */}
-        <div className={cn("flex items-center gap-1", !isShopRoute && "ml-auto")}>
-          {isShopRoute && (
+        <div className={cn("flex items-center gap-1", pathname.startsWith("/admin") && "ml-auto")}>
+          {showIcons && (
             <>
               <button
                 onClick={() => handleIconNav("/favorites")}
@@ -112,6 +118,13 @@ export function ShopHeader() {
                 className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
               >
                 <Heart className="size-4" />
+              </button>
+              <button
+                onClick={() => handleIconNav("/orders")}
+                title="Mis órdenes"
+                className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                <Package className="size-4" />
               </button>
               <button
                 onClick={() => handleIconNav("/cart")}

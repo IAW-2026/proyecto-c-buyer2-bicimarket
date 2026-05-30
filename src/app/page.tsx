@@ -167,9 +167,14 @@ export default function HomePage() {
     return Array.from(map.values()).slice(0, 3);
   }, [products]);
 
+  const sellerCount = useMemo(() => {
+    if (!products) return undefined;
+    return new Set(products.map((p) => p.sellerId ?? "unknown")).size;
+  }, [products]);
+
   return (
     <>
-      <HeroSection productCount={products?.length} />
+      <HeroSection productCount={products?.length} sellerCount={sellerCount} />
 
       <CategoriesSection counts={categoryCounts} />
 
@@ -199,7 +204,7 @@ export default function HomePage() {
 /* ──────────────────────────────────────────────
    HERO
 ──────────────────────────────────────────────── */
-function HeroSection({ productCount }: { productCount?: number }) {
+function HeroSection({ productCount, sellerCount }: { productCount?: number; sellerCount?: number }) {
   return (
     <section className="mx-auto flex w-full max-w-7xl flex-col items-center gap-10 px-6 py-16 lg:flex-row lg:gap-16 lg:py-20">
       {/* Left */}
@@ -221,7 +226,7 @@ function HeroSection({ productCount }: { productCount?: number }) {
           className="font-heading text-4xl font-black leading-tight tracking-tight lg:text-5xl xl:text-6xl"
         >
           De la bicicletería{" "}
-          <span className="text-primary">al sillín</span>
+          <span className="text-primary">al pedal</span>
           {", "}sin escalas.
         </motion.h1>
 
@@ -249,7 +254,7 @@ function HeroSection({ productCount }: { productCount?: number }) {
 
         <motion.div variants={fadeUp} className="flex items-center gap-8 border-t border-border/60 pt-6">
           {[
-            { value: "+340", label: "Bicicleterías vendiendo" },
+            { value: sellerCount ? `+${sellerCount}` : "+340", label: "Bicicleterías vendiendo" },
             { value: "24 h", label: "Envío promedio en CABA" },
             { value: "4.8 ★", label: "Promedio de reseñas" },
           ].map((stat) => (
