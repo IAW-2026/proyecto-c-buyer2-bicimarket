@@ -88,12 +88,44 @@ export function ShopHeader() {
             <Bike className="size-3.5 text-primary-foreground" />
           </div>
           <span className="font-heading text-base font-semibold tracking-tight">BiciMarket</span>
+          {pathname.startsWith("/admin") && (
+            <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+              Admin
+            </span>
+          )}
         </Link>
 
-        {/* Nav links — desktop only */}
-        <nav className="ml-2 hidden items-center gap-0.5 md:flex">
-          {pathname.startsWith("/admin")
-            ? ADMIN_NAV_LINKS.map((link) => {
+        {/* Nav links — solo en rutas no-admin, desktop only */}
+        {!pathname.startsWith("/admin") && (
+          <nav className="ml-2 hidden items-center gap-0.5 md:flex">
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
+                  pathname === link.href ? "font-medium text-foreground" : "text-muted-foreground",
+                )}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+        )}
+
+        {/* Search bar — visible for all buyer routes, hidden in admin */}
+        {!pathname.startsWith("/admin") && (
+          <Suspense fallback={<div className="mx-auto flex-1 lg:max-w-xl h-9" />}>
+            <SearchForm />
+          </Suspense>
+        )}
+
+        {/* Right actions */}
+        <div className="ml-auto flex items-center gap-1">
+          {/* Admin nav — derecha del header */}
+          {pathname.startsWith("/admin") && (
+            <nav className="hidden items-center gap-0.5 md:flex mr-2">
+              {ADMIN_NAV_LINKS.map((link) => {
                 const Icon = link.icon;
                 const isActive =
                   link.href === "/admin"
@@ -104,40 +136,20 @@ export function ShopHeader() {
                     key={link.href}
                     href={link.href}
                     className={cn(
-                      "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
-                      isActive ? "font-medium text-foreground" : "text-muted-foreground",
+                      "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors",
+                      isActive
+                        ? "bg-primary/15 text-primary font-medium"
+                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                     )}
                   >
                     <Icon className="size-4 shrink-0" />
                     {link.label}
                   </Link>
                 );
-              })
-            : NAV_LINKS.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={cn(
-                    "rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
-                    pathname === link.href
-                      ? "font-medium text-foreground"
-                      : "text-muted-foreground",
-                  )}
-                >
-                  {link.label}
-                </Link>
-              ))}
-        </nav>
+              })}
+            </nav>
+          )}
 
-        {/* Search bar — visible for all buyer routes, hidden in admin */}
-        {!pathname.startsWith("/admin") && (
-          <Suspense fallback={<div className="mx-auto flex-1 lg:max-w-xl h-9" />}>
-            <SearchForm />
-          </Suspense>
-        )}
-
-        {/* Right actions */}
-        <div className={cn("flex items-center gap-1", pathname.startsWith("/admin") && "ml-auto")}>
           {showIcons && (
             <>
               <button
