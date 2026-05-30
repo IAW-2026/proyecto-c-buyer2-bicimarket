@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
-import { Bike, Search, Heart, Package, ShoppingCart } from "lucide-react";
+import { Bike, Search, Heart, Package, ShoppingCart, LayoutDashboard, Users } from "lucide-react";
 import { UserToggle } from "@/components/header/user-toggle";
 import { useRole } from "@/hooks/use-role";
 import { HEADER_CATEGORIES } from "@/lib/categories";
@@ -13,6 +13,13 @@ const NAV_LINKS = [
   { href: "/shop", label: "Tienda" },
   { href: "/shop?ofertas=true", label: "Ofertas" },
   { href: "/#vendedores", label: "Vendedores" },
+];
+
+const ADMIN_NAV_LINKS = [
+  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin/orders", label: "Órdenes", icon: Package },
+  { href: "/admin/buyers", label: "Compradores", icon: Users },
+  { href: "/admin/carts", label: "Carritos", icon: ShoppingCart },
 ];
 
 function SearchForm() {
@@ -85,20 +92,41 @@ export function ShopHeader() {
 
         {/* Nav links — desktop only */}
         <nav className="ml-2 hidden items-center gap-0.5 md:flex">
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
-                pathname === link.href
-                  ? "font-medium text-foreground"
-                  : "text-muted-foreground",
-              )}
-            >
-              {link.label}
-            </Link>
-          ))}
+          {pathname.startsWith("/admin")
+            ? ADMIN_NAV_LINKS.map((link) => {
+                const Icon = link.icon;
+                const isActive =
+                  link.href === "/admin"
+                    ? pathname === "/admin"
+                    : pathname === link.href || pathname.startsWith(`${link.href}/`);
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
+                      isActive ? "font-medium text-foreground" : "text-muted-foreground",
+                    )}
+                  >
+                    <Icon className="size-4 shrink-0" />
+                    {link.label}
+                  </Link>
+                );
+              })
+            : NAV_LINKS.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
+                    pathname === link.href
+                      ? "font-medium text-foreground"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {link.label}
+                </Link>
+              ))}
         </nav>
 
         {/* Search bar — visible for all buyer routes, hidden in admin */}
