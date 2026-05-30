@@ -180,7 +180,7 @@ Fuente de verdad de: catálogo (`product`, precio, peso), perfil de vendedor, su
 | `description` | text | |
 | `brand` | string | |
 | `model` | string | |
-| `category` | enum `mtb` \| `road` \| `urban` \| `kids` \| `bmx` \| `parts` \| `accessories` | |
+| `category` | enum `mtb` \| `road` \| `urban` \| `kids` \| `bmx` \| `parts` \| `accessories` \| `indumentaria` | |
 | `condition` | enum `new` \| `used_like_new` \| `used_good` \| `used_fair` | |
 | `price_cents` | int | |
 | `currency` | string | |
