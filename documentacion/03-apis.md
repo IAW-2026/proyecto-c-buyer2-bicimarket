@@ -445,6 +445,28 @@ Lo llama Payments App. Requiere `X-Service-Token`.
 
 **Response 200**: la orden actualizada.
 
+### `PATCH /api/v1/orders/{orderId}/seller-groups/{groupId}/status` (server-to-server)
+
+Lo llama Seller App. Requiere `X-Service-Token` (`SELLER_TO_BUYER_SERVICE_TOKEN`).
+
+Notifica que el vendedor aceptó la orden, transicionando `order_seller_group.status` de `pending` → `preparing`.
+
+**Request**
+
+```json
+{
+  "status": "preparing"
+}
+```
+
+`status` válido: `preparing`.
+
+**Response 200**: el seller_group actualizado.
+
+**Error 409 INVALID_TRANSITION** si el grupo no está en `pending`.
+
+---
+
 ### `PATCH /api/v1/orders/{orderId}/seller-groups/{groupId}/shipping` (server-to-server)
 
 Lo llama Shipping App.
@@ -1469,6 +1491,7 @@ El body es el del endpoint receptor (ver cada sección de este doc), no un envel
 | Pago aprobado / rechazado / refunded       | Payments | Buyer    | `PATCH /api/v1/orders/{id}/status`                     |
 | Pago aprobado → crear sub-orden por seller | Payments | Seller   | `POST /api/v1/sales-orders`                            |
 | Liquidación settled                        | Payments | Seller   | `PATCH /api/v1/sales-orders/{id}/payment-status`       |
+| Vendedor acepta orden                      | Seller   | Buyer    | `PATCH /api/v1/orders/{id}/seller-groups/{g}/status`   |
 | Cambio de envío                            | Shipping | Buyer    | `PATCH /api/v1/orders/{id}/seller-groups/{g}/shipping` |
 | Cambio de envío                            | Shipping | Seller   | `PATCH /api/v1/sales-orders/{id}/shipping-status`      |
 | Envío entregado → gatilla liquidación      | Shipping | Payments | `POST /api/v1/internal/shipment-delivered`             |

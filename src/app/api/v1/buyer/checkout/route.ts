@@ -6,8 +6,8 @@ import {
   createPaymentSession,
   getOrCreateBuyerProfile,
   groupItemsBySeller,
-  getShippingQuoteForOrder,
 } from "@/lib/buyer-service";
+import { getShippingQuotes, DEFAULT_PACKAGE_DIMS } from "@/lib/shipping-api";
 
 const checkoutSchema = z.object({
   shippingAddressId: z.string().min(1),
@@ -18,13 +18,22 @@ const checkoutSchema = z.object({
 export async function POST(request: NextRequest) {
   const [{ userId }, body] = await Promise.all([auth(), request.json()]);
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: { code: "UNAUTHORIZED", message: "No autorizado", details: {} } },
+      { status: 401 },
+    );
   }
 
   const parsed = checkoutSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: parsed.error.issues.map((i) => i.message).join(", ") },
+      {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: parsed.error.issues.map((i) => i.message).join(", "),
+          details: {},
+        },
+      },
       { status: 400 },
     );
   }
@@ -40,11 +49,17 @@ export async function POST(request: NextRequest) {
   ]);
 
   if (!cart || cart.items.length === 0) {
-    return NextResponse.json({ error: "El carrito está vacío" }, { status: 400 });
+    return NextResponse.json(
+      { error: { code: "CART_EMPTY", message: "El carrito está vacío", details: {} } },
+      { status: 400 },
+    );
   }
 
   if (!address || address.buyerProfileId !== profile.id) {
-    return NextResponse.json({ error: "Dirección no encontrada" }, { status: 400 });
+    return NextResponse.json(
+      { error: { code: "ADDRESS_NOT_FOUND", message: "Dirección no encontrada", details: {} } },
+      { status: 400 },
+    );
   }
 
   const shippingAddressSnapshot = {
@@ -61,12 +76,9 @@ export async function POST(request: NextRequest) {
 
   const grouped = groupItemsBySeller(cart.items);
 
-  const shippingTotalCents = getShippingQuoteForOrder(cart.items);
-
   const groupedData = Object.entries(grouped).map(([sellerProfileId, items]) => ({
     sellerProfileId,
     items,
-    shippingCostCents: 0,
     weightGramsTotal: items.reduce(
       (sum, i) => sum + i.weightGramsSnapshot * i.quantity,
       0,
@@ -76,6 +88,23 @@ export async function POST(request: NextRequest) {
       0,
     ),
   }));
+
+  const quoteResponse = await getShippingQuotes({
+    pickups: groupedData.map((g) => ({
+      seller_profile_id: g.sellerProfileId,
+      packages: [{ weight_grams: g.weightGramsTotal, ...DEFAULT_PACKAGE_DIMS }],
+    })),
+    to: {
+      city: address.city,
+      province: address.province,
+      postal_code: address.postalCode,
+      country: address.country ?? "AR",
+    },
+    service_level: "standard",
+  });
+
+  const shippingTotalCents = quoteResponse.total_net_cents;
+  const quoteMap = new Map(quoteResponse.quotes.map((q) => [q.seller_profile_id, q.id]));
 
   const itemsTotalCents = groupedData.reduce((s, g) => s + g.itemsSubtotalCents, 0);
   const totalCents = itemsTotalCents + shippingTotalCents;
@@ -100,8 +129,9 @@ export async function POST(request: NextRequest) {
           orderId: order.id,
           sellerProfileId: g.sellerProfileId,
           itemsSubtotalCents: g.itemsSubtotalCents,
-          shippingCostCents: g.shippingCostCents,
+          shippingCostCents: 0,
           weightGramsTotal: g.weightGramsTotal,
+          shippingQuoteId: quoteMap.get(g.sellerProfileId) ?? null,
           status: "PENDING",
         },
       }),

@@ -17,7 +17,10 @@ const cartItemSchema = z.object({
 export async function GET() {
   const { userId } = await auth();
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: { code: "UNAUTHORIZED", message: "No autorizado", details: {} } },
+      { status: 401 },
+    );
   }
 
   const profile = await getOrCreateBuyerProfile(userId);
@@ -41,13 +44,22 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const [{ userId }, body] = await Promise.all([auth(), request.json()]);
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: { code: "UNAUTHORIZED", message: "No autorizado", details: {} } },
+      { status: 401 },
+    );
   }
 
   const parsed = cartItemSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: parsed.error.issues.map((i) => i.message).join(", ") },
+      {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: parsed.error.issues.map((i) => i.message).join(", "),
+          details: {},
+        },
+      },
       { status: 400 },
     );
   }

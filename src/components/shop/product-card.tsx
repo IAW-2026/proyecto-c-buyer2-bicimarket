@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Heart, ShoppingCart } from "lucide-react";
+import { Heart, ShoppingCart, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProductImage } from "@/components/shared/product-image";
 import { PriceDisplay } from "@/components/shared/price-display";
@@ -15,8 +15,10 @@ type ProductCardProps = {
   isFavorite?: boolean;
   isInCart?: boolean;
   isAddingToCart?: boolean;
+  isRemovingFromCart?: boolean;
   isAddingFavorite?: boolean;
   onAddToCart: (product: Product) => void;
+  onRemoveFromCart?: (product: Product) => void;
   onToggleFavorite: (product: Product) => void;
 };
 
@@ -30,8 +32,10 @@ export function ProductCard({
   isFavorite,
   isInCart,
   isAddingToCart,
+  isRemovingFromCart,
   isAddingFavorite,
   onAddToCart,
+  onRemoveFromCart,
   onToggleFavorite,
 }: ProductCardProps) {
   const router = useRouter();
@@ -113,7 +117,23 @@ export function ProductCard({
           <PriceDisplay amount={product.price ?? 0} className="text-sm font-bold" />
 
           {!product.isActive ? null : isInCart ? (
-            <span className="text-xs font-medium text-primary">✓ En carrito</span>
+            <div className="flex items-center gap-1">
+              <span className="text-xs font-medium text-primary">✓ En carrito</span>
+              {onRemoveFromCart && (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onRemoveFromCart(product);
+                  }}
+                  disabled={isRemovingFromCart}
+                  className="flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                  title="Quitar del carrito"
+                >
+                  <Trash2 className="size-3" />
+                </button>
+              )}
+            </div>
           ) : (
             <Can action="cart.add">
               {(granted) => (

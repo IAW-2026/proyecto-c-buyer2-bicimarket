@@ -38,7 +38,12 @@ export async function GET(
     },
   });
 
-  if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!order) {
+    return NextResponse.json(
+      { error: { code: "ORDER_NOT_FOUND", message: "Orden no encontrada", details: {} } },
+      { status: 404 },
+    );
+  }
 
   return NextResponse.json(order);
 }
@@ -56,13 +61,24 @@ export async function PATCH(
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: { code: "VALIDATION_ERROR", message: parsed.error.issues.map((i) => i.message).join(", ") } },
+      {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: parsed.error.issues.map((i) => i.message).join(", "),
+          details: {},
+        },
+      },
       { status: 400 }
     );
   }
 
   const order = await prisma.order.findUnique({ where: { id: orderId }, select: { id: true, status: true } });
-  if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!order) {
+    return NextResponse.json(
+      { error: { code: "ORDER_NOT_FOUND", message: "Orden no encontrada", details: {} } },
+      { status: 404 },
+    );
+  }
 
   const newStatus = parsed.data.status as OrderStatus;
 

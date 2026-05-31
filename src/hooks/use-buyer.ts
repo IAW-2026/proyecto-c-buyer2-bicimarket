@@ -12,6 +12,13 @@ import type {
   Product,
 } from "@/types/buyer";
 
+export interface PaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+  has_more: boolean;
+}
+
 // ─── Perfil ───────────────────────────────────────────────────────────────────
 
 export function useBuyerProfile() {
@@ -26,11 +33,13 @@ export function useBuyerProfile() {
 
 // ─── Direcciones ──────────────────────────────────────────────────────────────
 
-export function useBuyerAddresses() {
-  return useQuery<Address[]>({
-    queryKey: ["buyer-addresses"],
+export function useBuyerAddresses(page = 1) {
+  return useQuery<{ data: Address[]; pagination: PaginationMeta }>({
+    queryKey: ["buyer-addresses", page],
     queryFn: async () => {
-      const { data } = await api.get<Address[]>("/v1/buyer/addresses");
+      const { data } = await api.get<{ data: Address[]; pagination: PaginationMeta }>(
+        `/v1/buyer/addresses?page=${page}&limit=10`,
+      );
       return data;
     },
   });
@@ -52,12 +61,14 @@ export function useBuyerCart() {
 
 // ─── Favoritos ────────────────────────────────────────────────────────────────
 
-export function useFavoriteItems() {
+export function useFavoriteItems(page = 1) {
   const { isSignedIn } = useAuth();
-  return useQuery<FavoriteItem[]>({
-    queryKey: ["favorite-items"],
+  return useQuery<{ data: FavoriteItem[]; pagination: PaginationMeta }>({
+    queryKey: ["favorite-items", page],
     queryFn: async () => {
-      const { data } = await api.get<FavoriteItem[]>("/v1/buyer/favorites");
+      const { data } = await api.get<{ data: FavoriteItem[]; pagination: PaginationMeta }>(
+        `/v1/buyer/favorites?page=${page}&limit=12`,
+      );
       return data;
     },
     enabled: !!isSignedIn,
@@ -66,11 +77,13 @@ export function useFavoriteItems() {
 
 // ─── Órdenes ──────────────────────────────────────────────────────────────────
 
-export function useBuyerOrders() {
-  return useQuery<Order[]>({
-    queryKey: ["buyer-orders"],
+export function useBuyerOrders(page = 1) {
+  return useQuery<{ data: Order[]; pagination: PaginationMeta }>({
+    queryKey: ["buyer-orders", page],
     queryFn: async () => {
-      const { data } = await api.get<Order[]>("/v1/buyer/orders");
+      const { data } = await api.get<{ data: Order[]; pagination: PaginationMeta }>(
+        `/v1/buyer/orders?page=${page}&limit=10`,
+      );
       return data;
     },
   });
@@ -106,5 +119,6 @@ export function useProduct(productId: string) {
       const { data } = await api.get<Product>(`/products/${productId}`);
       return data;
     },
+    enabled: !!productId,
   });
 }

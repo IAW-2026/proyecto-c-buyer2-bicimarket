@@ -29,15 +29,35 @@ export const CATEGORIES: CategoryDef[] = [
 
 export const HEADER_CATEGORIES = [
   { id: "bicicletas", label: "Bicicletas" },
-  { id: "cuadros", label: "Cuadros" },
-  { id: "ruedas", label: "Ruedas y cubiertas" },
-  { id: "transmision", label: "Transmisión" },
-  { id: "frenos", label: "Frenos" },
-  { id: "cascos", label: "Cascos" },
-  { id: "indumentaria", label: "Indumentaria" },
-  { id: "herramientas", label: "Herramientas" },
+  { id: "componentes", label: "Componentes" },
   { id: "accesorios", label: "Accesorios" },
+  { id: "indumentaria", label: "Indumentaria" },
 ];
+
+export type BikeTypeDef = {
+  id: string;
+  label: string;
+  keywords: string[];
+};
+
+export const BIKE_TYPES: BikeTypeDef[] = [
+  { id: "mtb", label: "MTB", keywords: ["mtb", "mountain", "montaña", "trail", "enduro", "xc"] },
+  { id: "road", label: "Road / Gravel", keywords: ["road", "ruta", "roubaix", "carretera", "gravel"] },
+  { id: "urban", label: "Urban", keywords: ["urban", "urbana", "city", "ciudad", "fixie", "commuter"] },
+  { id: "kids", label: "Kids", keywords: ["kids", "niño", "niña", "infantil", "junior", "rodado 12", "rodado 16", "rodado 20"] },
+  { id: "bmx", label: "BMX", keywords: ["bmx", "freestyle", "dirt", "flatland", "pump track"] },
+  { id: "electric", label: "Eléctrica", keywords: ["eléctrica", "electrica", "ebike", "e-bike", "e bike", "motor", "batería", "pedelec"] },
+];
+
+export function matchesBikeType(
+  product: { title: string; description?: string | null },
+  bikeTypeId: string,
+): boolean {
+  const bt = BIKE_TYPES.find((t) => t.id === bikeTypeId);
+  if (!bt) return true;
+  const text = `${product.title} ${product.description ?? ""}`.toLowerCase();
+  return bt.keywords.some((kw) => text.includes(kw));
+}
 
 export function matchesCategory(
   product: { title: string; description?: string | null },

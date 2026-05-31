@@ -41,7 +41,7 @@ const STEP_DEFS = [
 const STATUS_STEP: Partial<Record<OrderStatus, number>> = {
   [OrderStatus.PENDING_PAYMENT]: 0,
   [OrderStatus.PAID]: 1,
-  [OrderStatus.PARTIALLY_SHIPPED]: 2,
+  [OrderStatus.PARTIALLY_SHIPPED]: 3,
   [OrderStatus.SHIPPED]: 3,
   [OrderStatus.DELIVERED]: 4,
   [OrderStatus.COMPLETED]: 4,
@@ -125,6 +125,7 @@ export function OrderStatusFlow({ status }: { status: OrderStatus }) {
     ? -1
     : (STATUS_STEP[status] ?? 0);
   const isCancelled = currentStep === -1;
+  const isFinished = status === OrderStatus.DELIVERED || status === OrderStatus.COMPLETED;
 
   const nodes: Node[] = useMemo(
     () =>
@@ -132,7 +133,7 @@ export function OrderStatusFlow({ status }: { status: OrderStatus }) {
         let state: NodeState;
         if (isCancelled) {
           state = "error";
-        } else if (i < currentStep) {
+        } else if (i < currentStep || (isFinished && i === currentStep)) {
           state = "completed";
         } else if (i === currentStep) {
           state = "current";
@@ -148,7 +149,7 @@ export function OrderStatusFlow({ status }: { status: OrderStatus }) {
           draggable: false,
         };
       }),
-    [currentStep, isCancelled],
+    [currentStep, isCancelled, isFinished],
   );
 
   const edges: Edge[] = useMemo(

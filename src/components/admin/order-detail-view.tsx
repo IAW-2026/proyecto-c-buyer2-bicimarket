@@ -5,6 +5,17 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { OrderStatus, SellerGroupStatus, ShippingStatus } from "@/generated/prisma/client";
 
+const SELLER_GROUP_STATUS_LABELS: Record<SellerGroupStatus, string> = {
+  PENDING: "Pendiente",
+  PREPARING: "Preparando",
+  READY_TO_SHIP: "Listo para enviar",
+  IN_TRANSIT: "En camino",
+  DELIVERED: "Entregado",
+  SETTLED: "Liquidado",
+  CANCELLED: "Cancelado",
+  REFUNDED: "Reembolsado",
+};
+
 const STATUS_LABELS: Record<OrderStatus, string> = {
   PENDING_PAYMENT: "Pago pendiente",
   PAID: "Pagado",
@@ -52,6 +63,18 @@ type OrderDetail = {
   }>;
 };
 
+const ORDER_STATUS_CLASS: Record<OrderStatus, string> = {
+  PENDING_PAYMENT: "bg-amber-100 text-amber-700 border-amber-200",
+  PAID: "bg-green-100 text-green-700 border-green-200",
+  PAYMENT_FAILED: "bg-red-100 text-red-700 border-red-200",
+  PARTIALLY_SHIPPED: "bg-blue-100 text-blue-700 border-blue-200",
+  SHIPPED: "bg-blue-100 text-blue-700 border-blue-200",
+  DELIVERED: "bg-green-100 text-green-700 border-green-200",
+  COMPLETED: "bg-green-100 text-green-700 border-green-200",
+  CANCELLED: "bg-red-100 text-red-700 border-red-200",
+  REFUNDED: "bg-orange-200 text-orange-900 border-orange-400",
+};
+
 const SELLER_ACCENT = [
   "border-l-blue-400",
   "border-l-emerald-400",
@@ -67,6 +90,8 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
   const [error, setError] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [groupUpdating, setGroupUpdating] = useState<Record<string, boolean>>({});
+  const [groupUpdateError, setGroupUpdateError] = useState<Record<string, string>>({});
 
   function loadOrder() {
     return fetch(`/api/admin/orders/${orderId}`)
@@ -81,6 +106,24 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
   useEffect(() => {
     loadOrder();
   }, [orderId]);
+
+  async function handleGroupStatusChange(groupId: string, newStatus: string) {
+    setGroupUpdating((prev) => ({ ...prev, [groupId]: true }));
+    setGroupUpdateError((prev) => ({ ...prev, [groupId]: "" }));
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}/seller-groups/${groupId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) throw new Error();
+      await loadOrder();
+    } catch {
+      setGroupUpdateError((prev) => ({ ...prev, [groupId]: "No se pudo actualizar." }));
+    } finally {
+      setGroupUpdating((prev) => ({ ...prev, [groupId]: false }));
+    }
+  }
 
   async function handleStatusChange(newStatus: string) {
     if (!order || newStatus === order.status) return;
@@ -124,7 +167,7 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
           <h2 className="font-heading text-xl font-bold">{order.buyerProfile.fullName}</h2>
           <p className="text-sm text-muted-foreground">{order.buyerProfile.email}</p>
         </div>
-        <Badge className="w-fit">{STATUS_LABELS[order.status]}</Badge>
+        <Badge variant="outline" className={`w-fit ${ORDER_STATUS_CLASS[order.status]}`}>{STATUS_LABELS[order.status]}</Badge>
       </div>
 
       {/* Cambiar estado */}
@@ -201,8 +244,19 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
                   <p className="text-[10px] font-mono text-muted-foreground break-all">{group.sellerProfileId}</p>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <Badge variant="outline" className="text-[11px]">{group.status}</Badge>
+              <div className="flex items-center gap-2 flex-wrap">
+                <select
+                  value={group.status}
+                  disabled={!!groupUpdating[group.id]}
+                  onChange={(e) => handleGroupStatusChange(group.id, e.target.value)}
+                  className="rounded-lg border border-border bg-background px-2 py-1 text-xs disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  {(Object.keys(SELLER_GROUP_STATUS_LABELS) as SellerGroupStatus[]).map((s) => (
+                    <option key={s} value={s}>{SELLER_GROUP_STATUS_LABELS[s]}</option>
+                  ))}
+                </select>
+                {groupUpdating[group.id] && <span className="text-xs text-muted-foreground">Actualizando…</span>}
+                {groupUpdateError[group.id] && <span className="text-xs text-destructive">{groupUpdateError[group.id]}</span>}
                 {group.shippingStatus && (
                   <Badge variant="secondary" className="text-[11px]">{group.shippingStatus}</Badge>
                 )}

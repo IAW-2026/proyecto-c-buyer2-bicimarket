@@ -61,7 +61,7 @@ export async function PATCH(
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: { code: "VALIDATION_ERROR", message: parsed.error.issues.map((i) => i.message).join(", ") } },
+      { error: { code: "VALIDATION_ERROR", message: parsed.error.issues.map((i) => i.message).join(", "), details: {} } },
       { status: 400 },
     );
   }
@@ -69,7 +69,7 @@ export async function PATCH(
   const group = await prisma.orderSellerGroup.findUnique({ where: { id: groupId } });
   if (!group || group.orderId !== orderId) {
     return NextResponse.json(
-      { error: { code: "GROUP_NOT_FOUND", message: "Grupo de vendedor no encontrado" } },
+      { error: { code: "GROUP_NOT_FOUND", message: "Grupo de vendedor no encontrado", details: {} } },
       { status: 404 },
     );
   }
@@ -88,22 +88,54 @@ export async function PATCH(
     },
   });
 
-  // Actualizar estado de la Order según el progreso de los grupos
-  if (parsed.data.status === "delivered") {
-    const allGroups = await prisma.orderSellerGroup.findMany({
-      where: { orderId },
+  // Actualizar estado de la Order según el progreso de todos los grupos
+  const allGroups = await prisma.orderSellerGroup.findMany({
+    where: { orderId },
+    select: { status: true },
+  });
+
+  const ADVANCED_STATUSES = new Set<SellerGroupStatus>([
+    SellerGroupStatus.IN_TRANSIT,
+    SellerGroupStatus.DELIVERED,
+    SellerGroupStatus.SETTLED,
+  ]);
+
+  const allInTransitOrMore = allGroups.every((g) => ADVANCED_STATUSES.has(g.status));
+  const allDelivered = allGroups.every(
+    (g) => g.status === SellerGroupStatus.DELIVERED || g.status === SellerGroupStatus.SETTLED,
+  );
+
+  let newOrderStatus: OrderStatus | null = null;
+
+  if (allDelivered) {
+    newOrderStatus = OrderStatus.DELIVERED;
+  } else if (allInTransitOrMore) {
+    newOrderStatus = OrderStatus.SHIPPED;
+  } else if (parsed.data.status === "in_transit") {
+    newOrderStatus = OrderStatus.PARTIALLY_SHIPPED;
+  }
+
+  if (newOrderStatus) {
+    const currentOrder = await prisma.order.findUnique({
+      where: { id: orderId },
       select: { status: true },
     });
-    const allDelivered = allGroups.every((g) => g.status === SellerGroupStatus.DELIVERED);
-    await prisma.order.update({
-      where: { id: orderId },
-      data: { status: allDelivered ? OrderStatus.DELIVERED : OrderStatus.PARTIALLY_SHIPPED },
-    });
-  } else if (parsed.data.status === "in_transit") {
-    await prisma.order.update({
-      where: { id: orderId },
-      data: { status: OrderStatus.SHIPPED },
-    });
+    if (currentOrder && currentOrder.status !== newOrderStatus) {
+      await Promise.all([
+        prisma.order.update({
+          where: { id: orderId },
+          data: { status: newOrderStatus },
+        }),
+        prisma.orderStatusHistory.create({
+          data: {
+            orderId,
+            fromStatus: currentOrder.status,
+            toStatus: newOrderStatus,
+            source: "shipping",
+          },
+        }),
+      ]);
+    }
   }
 
   return NextResponse.json({ id: groupId, status: newStatus });

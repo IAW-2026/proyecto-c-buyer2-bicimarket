@@ -14,9 +14,10 @@ import type { Product } from "@/types/buyer";
 
 function ShopContent() {
   const { data: products, isLoading } = useProducts();
-  const { data: favorites } = useFavoriteItems();
+  const { data: favoritesResult } = useFavoriteItems();
+  const favorites = favoritesResult?.data;
   const { data: cart } = useBuyerCart();
-  const { addItem: addCartItem } = useCartMutations();
+  const { addItem: addCartItem, removeItem: removeCartItem } = useCartMutations();
   const { addItem: addFavoriteItem, removeItem: removeFavoriteItem } = useFavoriteMutations();
   const shopFilters = useShopFilters(products);
 
@@ -32,6 +33,11 @@ function ShopContent() {
       quantity: 1,
       weightGramsSnapshot: 0,
     });
+  }
+
+  async function handleRemoveFromCart(product: Product) {
+    const cartItem = cart?.items.find((i) => i.productId === product.id);
+    if (cartItem) await removeCartItem.mutateAsync(cartItem.id);
   }
 
   async function handleToggleFavorite(product: Product) {
@@ -97,10 +103,12 @@ function ShopContent() {
                 isFavorite={favoriteProductIds.has(product.id)}
                 isInCart={cartProductIds.has(product.id)}
                 isAddingToCart={addCartItem.isPending}
+                isRemovingFromCart={removeCartItem.isPending}
                 isAddingFavorite={
                   addFavoriteItem.isPending || removeFavoriteItem.isPending
                 }
                 onAddToCart={handleAddToCart}
+                onRemoveFromCart={handleRemoveFromCart}
                 onToggleFavorite={handleToggleFavorite}
               />
             ))}

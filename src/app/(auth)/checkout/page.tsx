@@ -26,7 +26,8 @@ type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 export default function CheckoutPage() {
   const router = useRouter();
   const { data: cart, isLoading: cartLoading } = useBuyerCart();
-  const { data: addresses, isLoading: addressesLoading } = useBuyerAddresses();
+  const { data: addressesResult, isLoading: addressesLoading } = useBuyerAddresses();
+  const addresses = addressesResult?.data;
   const { checkout } = useCheckoutMutations();
   const selectedAddressId = useCartStore((s) => s.selectedAddressId);
   const setSelectedAddressId = useCartStore((s) => s.setSelectedAddressId);
@@ -64,8 +65,11 @@ export default function CheckoutPage() {
   }
 
   const sellerGroups = groupCartItemsBySeller(cart.items);
-  const totalGrams = cart.items.reduce((s, i) => s + i.weightGramsSnapshot * i.quantity, 0);
-  const totalShipping = Math.round(800 + (totalGrams / 100) * 50) / 100;
+  // Misma fórmula que el mock de shipping-api.ts: $10k base + $4k por vendedor
+  const n = sellerGroups.length;
+  const grossCents = 1_000_000 + 400_000 * n;
+  const discountPct = Math.min(0.05 * (n - 1), 0.2);
+  const totalShipping = Math.round(grossCents * (1 - discountPct)) / 100;
   const selectedAddress = addresses?.find((a) => a.id === form.watch("shippingAddressId"));
 
   return (

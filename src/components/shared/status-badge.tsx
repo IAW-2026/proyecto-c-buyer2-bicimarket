@@ -41,7 +41,7 @@ const ORDER_STATUS_CONFIG: Record<OrderStatus, OrderStatusConfig> = {
   },
   [OrderStatus.REFUNDED]: {
     label: "Reembolsado",
-    className: "bg-orange-100 text-orange-700 border-orange-200",
+    className: "bg-orange-200 text-orange-900 border-orange-400",
   },
 };
 
@@ -76,7 +76,7 @@ const SELLER_GROUP_STATUS_CONFIG: Record<SellerGroupStatus, OrderStatusConfig> =
   },
   [SellerGroupStatus.REFUNDED]: {
     label: "Reembolsado",
-    className: "bg-orange-100 text-orange-700 border-orange-200",
+    className: "bg-orange-200 text-orange-900 border-orange-400",
   },
 };
 

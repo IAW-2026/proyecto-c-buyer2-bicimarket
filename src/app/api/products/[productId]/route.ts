@@ -26,7 +26,10 @@ export async function GET(
   const { data } = await getSellerProducts();
   const found = data.find((p) => p.id === productId);
   if (!found) {
-    return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
+    return NextResponse.json(
+      { error: { code: "PRODUCT_NOT_FOUND", message: "Producto no encontrado", details: {} } },
+      { status: 404 },
+    );
   }
   return NextResponse.json(toProduct(found));
 }

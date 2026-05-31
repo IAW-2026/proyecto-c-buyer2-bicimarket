@@ -12,9 +12,12 @@ type DashboardData = {
 };
 
 export function useDashboardData(): DashboardData {
-  const { data: orders, isLoading: ordersLoading } = useBuyerOrders();
+  const { data: ordersResult, isLoading: ordersLoading } = useBuyerOrders();
   const { data: cart, isLoading: cartLoading } = useBuyerCart();
-  const { data: favorites, isLoading: favoritesLoading } = useFavoriteItems();
+  const { data: favoritesResult, isLoading: favoritesLoading } = useFavoriteItems();
+
+  const orders = ordersResult?.data;
+  const favorites = favoritesResult?.data;
 
   const lastOrder = orders
     ? [...orders].sort(
@@ -23,10 +26,10 @@ export function useDashboardData(): DashboardData {
     : undefined;
 
   return {
-    ordersTotal: orders?.length ?? 0,
+    ordersTotal: ordersResult?.pagination?.total ?? orders?.length ?? 0,
     lastOrder,
     cartItemCount: cart?.itemCount ?? 0,
-    favoritesCount: favorites?.length ?? 0,
+    favoritesCount: favoritesResult?.pagination?.total ?? favorites?.length ?? 0,
     isLoading: ordersLoading || cartLoading || favoritesLoading,
   };
 }

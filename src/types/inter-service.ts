@@ -46,32 +46,69 @@ export type ProductAvailability = {
 // Shipping App — /api/v1/shipping-quotes
 // ------------------------------------------------------------
 
-export type ShippingQuoteItem = {
+export type ShippingPackage = {
   weight_grams: number;
-  quantity: number;
+  length_cm: number;
+  width_cm: number;
+  height_cm: number;
 };
 
-export type ShippingAddress = {
-  street: string;
+export type ShippingPickup = {
+  seller_profile_id: string;
+  packages: ShippingPackage[];
+};
+
+export type ShippingDestination = {
   city: string;
-  state: string;
-  zip: string;
+  province: string;
+  postal_code: string;
   country: string;
 };
 
+export type ServiceLevel = "standard" | "express" | "same_day";
+
+// POST /api/v1/shipping-quotes — un request con N orígenes (uno por vendedor)
 export type ShippingQuoteRequest = {
-  seller_profile_id: string;
-  shipping_address: ShippingAddress;
-  items: ShippingQuoteItem[];
+  pickups: ShippingPickup[];
+  to: ShippingDestination;
+  service_level: ServiceLevel;
 };
 
-// POST /api/v1/shipping-quotes → response per seller
-export type ShippingQuote = {
+// Cotización individual por vendedor dentro de la respuesta
+export type ShippingQuoteItem = {
+  id: string;
   seller_profile_id: string;
-  cost: number;
-  estimated_days: number;
+  service_level: ServiceLevel;
+  carrier: string;
+  cost_cents: number;
+  currency: string;
+  estimated_days_min: number;
+  estimated_days_max: number;
+  weight_grams_total: number;
   packages_count: number;
-  total_weight: number;
+  expires_at: string;
+};
+
+// POST /api/v1/shipping-quotes — response
+export type ShippingQuoteResponse = {
+  origins_count: number;
+  discount_pct: number;       // 5% por origen extra, tope 20%
+  total_gross_cents: number;
+  total_net_cents: number;    // lo que se cobra al comprador
+  currency: string;
+  quotes: ShippingQuoteItem[];
+};
+
+// GET /api/v1/quote-preview — response (sin persistencia, para preview en carrito)
+export type ShippingQuotePreview = {
+  cost_cents: number;
+  currency: string;
+  carrier: string;
+  service_level: ServiceLevel;
+  distance_km: number;
+  weight_grams_total: number;
+  estimated_days_min: number;
+  estimated_days_max: number;
 };
 
 // GET /api/v1/shipments?orderId=X

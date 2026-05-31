@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import type { Product } from "@/types/buyer";
-import { matchesCategory } from "@/lib/categories";
+import { matchesCategory, matchesBikeType } from "@/lib/categories";
 
 export function useShopFilters(products: Product[] | undefined) {
   const router = useRouter();
@@ -16,8 +16,9 @@ export function useShopFilters(products: Product[] | undefined) {
   const selectedSellers = searchParams.get("sellers")?.split(",").filter(Boolean) ?? [];
   const minPrice = Number(searchParams.get("minPrice") ?? 0);
   const maxPrice = Number(searchParams.get("maxPrice") ?? 10_000_000);
+  const bikeType = searchParams.get("bikeType") ?? "";
 
-  const filters = { searchQuery, category, onlyInStock, selectedSellers, minPrice, maxPrice };
+  const filters = { searchQuery, category, onlyInStock, selectedSellers, minPrice, maxPrice, bikeType };
 
   function updateParams(updates: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -64,16 +65,21 @@ export function useShopFilters(products: Product[] | undefined) {
         if (!haystack.includes(q)) return false;
       }
       if (category && !matchesCategory(p, category)) return false;
+      if (category === "bicicletas" && bikeType && !matchesBikeType(p, bikeType)) return false;
       return true;
     });
-  }, [products, minPrice, maxPrice, onlyInStock, selectedSellers, searchQuery, category]);
+  }, [products, minPrice, maxPrice, onlyInStock, selectedSellers, searchQuery, category, bikeType]);
 
   function setSearchQuery(value: string) {
     updateParams({ q: value || null });
   }
 
   function setCategory(value: string) {
-    updateParams({ category: value || null });
+    updateParams({ category: value || null, bikeType: null });
+  }
+
+  function setBikeType(value: string) {
+    updateParams({ bikeType: value || null });
   }
 
   function setOnlyInStock(value: boolean) {
@@ -111,6 +117,7 @@ export function useShopFilters(products: Product[] | undefined) {
     setPriceRange,
     setSearchQuery,
     setCategory,
+    setBikeType,
     clearFilters,
   };
 }

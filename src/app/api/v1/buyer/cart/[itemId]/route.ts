@@ -13,14 +13,23 @@ export async function PATCH(
   const { userId } = await auth();
   const { itemId } = await context.params;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: { code: "UNAUTHORIZED", message: "No autorizado", details: {} } },
+      { status: 401 },
+    );
   }
 
   const body = await request.json();
   const parsed = quantitySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: parsed.error.issues.map((i) => i.message).join(", ") },
+      {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: parsed.error.issues.map((i) => i.message).join(", "),
+          details: {},
+        },
+      },
       { status: 400 },
     );
   }
@@ -29,12 +38,18 @@ export async function PATCH(
   const item = await prisma.cartItem.findUnique({ where: { id: itemId } });
 
   if (!item) {
-    return NextResponse.json({ error: "Cart item not found" }, { status: 404 });
+    return NextResponse.json(
+      { error: { code: "CART_ITEM_NOT_FOUND", message: "Item del carrito no encontrado", details: {} } },
+      { status: 404 },
+    );
   }
 
   const cart = await prisma.cart.findUnique({ where: { id: item.cartId } });
   if (!cart || cart.buyerProfileId !== profile.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: { code: "UNAUTHORIZED", message: "No autorizado", details: {} } },
+      { status: 401 },
+    );
   }
 
   const updated = await prisma.cartItem.update({
@@ -52,19 +67,28 @@ export async function DELETE(
   const { userId } = await auth();
   const { itemId } = await context.params;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: { code: "UNAUTHORIZED", message: "No autorizado", details: {} } },
+      { status: 401 },
+    );
   }
 
   const profile = await getOrCreateBuyerProfile(userId);
   const item = await prisma.cartItem.findUnique({ where: { id: itemId } });
 
   if (!item) {
-    return NextResponse.json({ error: "Cart item not found" }, { status: 404 });
+    return NextResponse.json(
+      { error: { code: "CART_ITEM_NOT_FOUND", message: "Item del carrito no encontrado", details: {} } },
+      { status: 404 },
+    );
   }
 
   const cart = await prisma.cart.findUnique({ where: { id: item.cartId } });
   if (!cart || cart.buyerProfileId !== profile.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: { code: "UNAUTHORIZED", message: "No autorizado", details: {} } },
+      { status: 401 },
+    );
   }
 
   await prisma.cartItem.delete({ where: { id: itemId } });

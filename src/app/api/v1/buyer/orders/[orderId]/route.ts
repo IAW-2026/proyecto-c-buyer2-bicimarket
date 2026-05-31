@@ -10,7 +10,10 @@ export async function GET(
   const { userId } = await auth();
   const { orderId } = await context.params;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: { code: "UNAUTHORIZED", message: "No autorizado", details: {} } },
+      { status: 401 },
+    );
   }
 
   const profile = await getOrCreateBuyerProfile(userId);
@@ -24,7 +27,10 @@ export async function GET(
   });
 
   if (!order || order.buyerProfileId !== profile.id) {
-    return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    return NextResponse.json(
+      { error: { code: "ORDER_NOT_FOUND", message: "Orden no encontrada", details: {} } },
+      { status: 404 },
+    );
   }
 
   return NextResponse.json(order);

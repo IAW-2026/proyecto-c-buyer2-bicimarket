@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { EmptyState } from "@/components/shared/empty-state";
+import { PaginationControls } from "@/components/shared/pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const addressSchema = z.object({
@@ -27,9 +28,13 @@ const addressSchema = z.object({
 type AddressFormValues = z.infer<typeof addressSchema>;
 
 export function AddressList() {
-  const { data: addresses, isLoading } = useBuyerAddresses();
+  const [page, setPage] = useState(1);
+  const { data: result, isLoading } = useBuyerAddresses(page);
   const { create: createAddress, remove: deleteAddress } = useAddressMutations();
   const [showForm, setShowForm] = useState(false);
+
+  const addresses = result?.data ?? [];
+  const pagination = result?.pagination;
 
   const form = useForm<AddressFormValues>({
     resolver: zodResolver(addressSchema),
@@ -46,7 +51,7 @@ export function AddressList() {
 
   return (
     <div className="space-y-3">
-      {(!addresses || addresses.length === 0) && !showForm && (
+      {addresses.length === 0 && !showForm && (
         <EmptyState
           icon={MapPin}
           title="Sin direcciones"
@@ -54,7 +59,7 @@ export function AddressList() {
         />
       )}
 
-      {addresses?.map((address) => (
+      {addresses.map((address) => (
         <div
           key={address.id}
           className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-card px-4 py-3"
@@ -79,6 +84,16 @@ export function AddressList() {
           </Button>
         </div>
       ))}
+
+      {pagination && pagination.total > pagination.limit && (
+        <PaginationControls
+          page={page}
+          total={pagination.total}
+          limit={pagination.limit}
+          onChange={setPage}
+          className="pt-1"
+        />
+      )}
 
       {showForm && (
         <form

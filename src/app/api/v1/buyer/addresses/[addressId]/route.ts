@@ -26,13 +26,22 @@ export async function PATCH(
     request.json(),
   ]);
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: { code: "UNAUTHORIZED", message: "No autorizado", details: {} } },
+      { status: 401 },
+    );
   }
 
   const parsed = addressSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: parsed.error.issues.map((i) => i.message).join(", ") },
+      {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: parsed.error.issues.map((i) => i.message).join(", "),
+          details: {},
+        },
+      },
       { status: 400 },
     );
   }
@@ -41,7 +50,10 @@ export async function PATCH(
   const address = await prisma.address.findUnique({ where: { id: addressId } });
 
   if (!address || address.buyerProfileId !== profile.id) {
-    return NextResponse.json({ error: "Address not found" }, { status: 404 });
+    return NextResponse.json(
+      { error: { code: "ADDRESS_NOT_FOUND", message: "Dirección no encontrada", details: {} } },
+      { status: 404 },
+    );
   }
 
   if (parsed.data.isDefault) {
@@ -66,14 +78,20 @@ export async function DELETE(
   const { userId } = await auth();
   const { addressId } = await context.params;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: { code: "UNAUTHORIZED", message: "No autorizado", details: {} } },
+      { status: 401 },
+    );
   }
 
   const profile = await getOrCreateBuyerProfile(userId);
   const address = await prisma.address.findUnique({ where: { id: addressId } });
 
   if (!address || address.buyerProfileId !== profile.id) {
-    return NextResponse.json({ error: "Address not found" }, { status: 404 });
+    return NextResponse.json(
+      { error: { code: "ADDRESS_NOT_FOUND", message: "Dirección no encontrada", details: {} } },
+      { status: 404 },
+    );
   }
 
   await prisma.address.delete({ where: { id: addressId } });

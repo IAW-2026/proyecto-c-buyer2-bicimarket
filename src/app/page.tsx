@@ -115,7 +115,8 @@ const TABS = [
 ══════════════════════════════════════════════ */
 export default function HomePage() {
   const { data: products, isLoading } = useProducts();
-  const { data: favorites } = useFavoriteItems();
+  const { data: favoritesResult } = useFavoriteItems();
+  const favorites = favoritesResult?.data;
   const { data: cart } = useBuyerCart();
   const { addItem: addCartItem } = useCartMutations();
   const { addItem: addFavoriteItem, removeItem: removeFavoriteItem } = useFavoriteMutations();

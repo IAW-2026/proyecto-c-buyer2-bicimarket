@@ -16,31 +16,63 @@ const addressSchema = z.object({
   isDefault: z.boolean().optional(),
 });
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const { userId } = await auth();
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: { code: "UNAUTHORIZED", message: "No autorizado", details: {} } },
+      { status: 401 },
+    );
   }
 
-  const profile = await getOrCreateBuyerProfile(userId);
-  const addresses = await prisma.address.findMany({
-    where: { buyerProfileId: profile.id },
-    orderBy: { createdAt: "desc" },
-  });
+  const { searchParams } = request.nextUrl;
+  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
+  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") ?? "20", 10)));
+  const skip = (page - 1) * limit;
 
-  return NextResponse.json(addresses);
+  const profile = await getOrCreateBuyerProfile(userId);
+  const where = { buyerProfileId: profile.id };
+
+  const [total, addresses] = await Promise.all([
+    prisma.address.count({ where }),
+    prisma.address.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+    }),
+  ]);
+
+  return NextResponse.json({
+    data: addresses,
+    pagination: {
+      total,
+      page,
+      limit,
+      has_more: skip + addresses.length < total,
+    },
+  });
 }
 
 export async function POST(request: NextRequest) {
   const [{ userId }, body] = await Promise.all([auth(), request.json()]);
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: { code: "UNAUTHORIZED", message: "No autorizado", details: {} } },
+      { status: 401 },
+    );
   }
 
   const parsed = addressSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: parsed.error.issues.map((i) => i.message).join(", ") },
+      {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: parsed.error.issues.map((i) => i.message).join(", "),
+          details: {},
+        },
+      },
       { status: 400 },
     );
   }

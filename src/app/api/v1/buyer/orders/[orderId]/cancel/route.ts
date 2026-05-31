@@ -16,7 +16,10 @@ export async function POST(
 ) {
   const { userId } = await auth();
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: { code: "UNAUTHORIZED", message: "No autorizado", details: {} } },
+      { status: 401 },
+    );
   }
 
   const { orderId } = await context.params;
@@ -24,12 +27,21 @@ export async function POST(
 
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order || order.buyerProfileId !== profile.id) {
-    return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    return NextResponse.json(
+      { error: { code: "ORDER_NOT_FOUND", message: "Orden no encontrada", details: {} } },
+      { status: 404 },
+    );
   }
 
   if (!CANCELLABLE_STATUSES.includes(order.status)) {
     return NextResponse.json(
-      { error: "Order cannot be cancelled in its current status" },
+      {
+        error: {
+          code: "ORDER_NOT_CANCELLABLE",
+          message: "La orden no puede ser cancelada en su estado actual",
+          details: {},
+        },
+      },
       { status: 409 },
     );
   }

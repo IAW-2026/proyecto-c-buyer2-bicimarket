@@ -36,7 +36,7 @@ export async function PATCH(
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: { code: "VALIDATION_ERROR", message: parsed.error.issues.map((i) => i.message).join(", ") } },
+      { error: { code: "VALIDATION_ERROR", message: parsed.error.issues.map((i) => i.message).join(", "), details: {} } },
       { status: 400 },
     );
   }
@@ -44,7 +44,7 @@ export async function PATCH(
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) {
     return NextResponse.json(
-      { error: { code: "ORDER_NOT_FOUND", message: "Orden no encontrada" } },
+      { error: { code: "ORDER_NOT_FOUND", message: "Orden no encontrada", details: {} } },
       { status: 404 },
     );
   }

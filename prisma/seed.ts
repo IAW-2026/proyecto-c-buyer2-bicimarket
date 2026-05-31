@@ -133,7 +133,8 @@ async function seedProfile(profileId: string, email: string) {
   };
 
   const itemsTotal1 = trek.price + casco.price * 2; // 450000 + 70000 = 520000
-  const shipping1 = 3500;
+  // 1 vendedor → $10k + $4k = $14,000 ARS
+  const shipping1 = 1_400_000;
 
   const order1 = await prisma.order.create({
     data: {
@@ -154,7 +155,7 @@ async function seedProfile(profileId: string, email: string) {
       orderId: order1.id,
       sellerProfileId: "sel_mock_001",
       itemsSubtotalCents: itemsTotal1,
-      shippingCostCents: shipping1,
+      shippingCostCents: 0,
       shippingQuoteId: "quote_seed_001",
       shipmentId: "ship_seed_001",
       weightGramsTotal: trek.weightGrams + casco.weightGrams * 2,
@@ -216,7 +217,8 @@ async function seedProfile(profileId: string, email: string) {
   // ----- Order 2: PENDING_PAYMENT -----
   const totem = MOCK_PRODUCTS[1];
   const itemsTotal2 = totem.price;
-  const shipping2 = 4200;
+  // 1 vendedor → $10k + $4k = $14,000 ARS
+  const shipping2 = 1_400_000;
 
   const order2 = await prisma.order.create({
     data: {
@@ -235,7 +237,7 @@ async function seedProfile(profileId: string, email: string) {
       orderId: order2.id,
       sellerProfileId: totem.sellerId,
       itemsSubtotalCents: itemsTotal2,
-      shippingCostCents: shipping2,
+      shippingCostCents: 0,
       shippingQuoteId: "quote_seed_002",
       weightGramsTotal: totem.weightGrams,
       status: SellerGroupStatus.PENDING,

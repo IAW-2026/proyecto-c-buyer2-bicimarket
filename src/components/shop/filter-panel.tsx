@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { formatPrice } from "@/components/shared/price-display";
 import type { useShopFilters } from "@/hooks/use-shop-filters";
+import { BIKE_TYPES } from "@/lib/categories";
 
 type FilterPanelProps = {
   filters: ReturnType<typeof useShopFilters>;
 };
 
 export function FilterPanel({ filters }: FilterPanelProps) {
-  const { onlyInStock, selectedSellers } = filters.filters;
+  const { onlyInStock, selectedSellers, category, bikeType } = filters.filters;
 
   return (
     <aside className="flex flex-col gap-5">
@@ -41,6 +42,30 @@ export function FilterPanel({ filters }: FilterPanelProps) {
           <span>{formatPrice(filters.filters.maxPrice)}</span>
         </div>
       </div>
+
+      {/* Bike type sub-filter */}
+      {category === "bicicletas" && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">Tipo de bicicleta</p>
+          <ul className="space-y-1.5">
+            {BIKE_TYPES.map((bt) => (
+              <li key={bt.id}>
+                <button
+                  type="button"
+                  onClick={() => filters.setBikeType(bikeType === bt.id ? "" : bt.id)}
+                  className={`w-full rounded-md px-3 py-1.5 text-left text-xs transition-colors ${
+                    bikeType === bt.id
+                      ? "bg-primary text-primary-foreground font-medium"
+                      : "hover:bg-muted text-foreground"
+                  }`}
+                >
+                  {bt.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Stock toggle */}
       <div className="flex items-center justify-between">

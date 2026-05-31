@@ -10,7 +10,10 @@ export async function DELETE(
   const { userId } = await auth();
   const { favoriteId } = await context.params;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: { code: "UNAUTHORIZED", message: "No autorizado", details: {} } },
+      { status: 401 },
+    );
   }
 
   const profile = await getOrCreateBuyerProfile(userId);
@@ -20,7 +23,7 @@ export async function DELETE(
 
   if (!favorite || favorite.buyerProfileId !== profile.id) {
     return NextResponse.json(
-      { error: "Favorite item not found" },
+      { error: { code: "FAVORITE_NOT_FOUND", message: "Favorito no encontrado", details: {} } },
       { status: 404 },
     );
   }

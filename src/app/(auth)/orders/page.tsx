@@ -1,15 +1,22 @@
 "use client";
 
+import { useState } from "react";
 import { Package } from "lucide-react";
 import { useBuyerOrders } from "@/hooks/use-buyer";
 import { useOrderTabs } from "@/hooks/use-order-tabs";
 import { OrderCard } from "@/components/orders/order-card";
 import { EmptyState } from "@/components/shared/empty-state";
+import { PaginationControls } from "@/components/shared/pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 export default function OrdersPage() {
-  const { data: orders, isLoading } = useBuyerOrders();
+  const [page, setPage] = useState(1);
+  const { data: result, isLoading } = useBuyerOrders(page);
+
+  const orders = result?.data;
+  const pagination = result?.pagination;
+
   const { activeTab, setActiveTab, filtered, tabsWithCount } = useOrderTabs(orders);
 
   return (
@@ -17,7 +24,7 @@ export default function OrdersPage() {
       <h1 className="font-heading mb-1 text-2xl font-bold tracking-tight">Mis órdenes</h1>
       {!isLoading && (
         <p className="mb-5 text-xs text-muted-foreground">
-          {orders?.length ?? 0} pedido{(orders?.length ?? 0) !== 1 ? "s" : ""} en total
+          {pagination?.total ?? 0} pedido{(pagination?.total ?? 0) !== 1 ? "s" : ""} en total
         </p>
       )}
 
@@ -26,7 +33,10 @@ export default function OrdersPage() {
         {tabsWithCount.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => {
+              setActiveTab(tab.key);
+              setPage(1);
+            }}
             className={cn(
               "shrink-0 rounded-lg px-3 py-1.5 text-sm transition-colors",
               activeTab === tab.key
@@ -70,6 +80,19 @@ export default function OrdersPage() {
             <OrderCard key={order.id} order={order} />
           ))}
         </div>
+      )}
+
+      {!isLoading && pagination && (
+        <PaginationControls
+          page={page}
+          total={pagination.total}
+          limit={pagination.limit}
+          onChange={(p) => {
+            setPage(p);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+          className="mt-6"
+        />
       )}
     </div>
   );

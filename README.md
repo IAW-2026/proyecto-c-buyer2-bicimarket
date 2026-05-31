@@ -64,15 +64,15 @@ src/
 │   ├── sign-in/                # Login (Clerk)
 │   ├── sign-up/                # Registro (Clerk)
 │   └── api/
-│       ├── buyer/              # Endpoints que usa la UI del Buyer App
-│       │   ├── profile/
-│       │   ├── addresses/
-│       │   ├── cart/
-│       │   ├── favorites/
-│       │   ├── orders/
-│       │   └── checkout/
-│       └── v1/                 # Endpoints que llaman otras apps (X-Service-Token)
-│           └── orders/
+│       └── v1/                 # Todos los endpoints viven bajo /api/v1/
+│           ├── buyer/          # Endpoints que usa la UI del Buyer App
+│           │   ├── profile/
+│           │   ├── addresses/
+│           │   ├── cart/
+│           │   ├── favorites/
+│           │   ├── orders/
+│           │   └── checkout/
+│           └── orders/         # Endpoints que llaman otras apps (X-Service-Token)
 │               └── [orderId]/
 │                   ├── route.ts                    # PATCH status (←Payments)
 │                   └── seller-groups/
@@ -133,22 +133,22 @@ documentacion/                  # Documentación general del sistema (compartida
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| GET | `/api/buyer/profile` | Obtiene o crea el perfil del comprador |
-| PATCH | `/api/buyer/profile` | Actualiza datos del perfil |
-| GET | `/api/buyer/addresses` | Lista las direcciones guardadas |
-| POST | `/api/buyer/addresses` | Agrega una dirección |
-| PATCH | `/api/buyer/addresses/[id]` | Edita una dirección |
-| DELETE | `/api/buyer/addresses/[id]` | Elimina una dirección |
-| GET | `/api/buyer/cart` | Obtiene el carrito activo con totales |
-| POST | `/api/buyer/cart` | Agrega un ítem al carrito |
-| PATCH | `/api/buyer/cart/[id]` | Actualiza cantidad de un ítem |
-| DELETE | `/api/buyer/cart/[id]` | Elimina un ítem del carrito |
-| GET | `/api/buyer/favorites` | Lista favoritos |
-| POST | `/api/buyer/favorites` | Agrega un favorito |
-| DELETE | `/api/buyer/favorites/[id]` | Elimina un favorito |
-| GET | `/api/buyer/orders` | Lista órdenes del comprador |
-| GET | `/api/buyer/orders/[id]` | Detalle de una orden |
-| POST | `/api/buyer/checkout` | Convierte el carrito en orden |
+| GET | `/api/v1/buyer/profile` | Obtiene o crea el perfil del comprador |
+| PATCH | `/api/v1/buyer/profile` | Actualiza datos del perfil |
+| GET | `/api/v1/buyer/addresses` | Lista las direcciones guardadas |
+| POST | `/api/v1/buyer/addresses` | Agrega una dirección |
+| PATCH | `/api/v1/buyer/addresses/[id]` | Edita una dirección |
+| DELETE | `/api/v1/buyer/addresses/[id]` | Elimina una dirección |
+| GET | `/api/v1/buyer/cart` | Obtiene el carrito activo con totales |
+| POST | `/api/v1/buyer/cart` | Agrega un ítem al carrito |
+| PATCH | `/api/v1/buyer/cart/[id]` | Actualiza cantidad de un ítem |
+| DELETE | `/api/v1/buyer/cart/[id]` | Elimina un ítem del carrito |
+| GET | `/api/v1/buyer/favorites` | Lista favoritos |
+| POST | `/api/v1/buyer/favorites` | Agrega un favorito |
+| DELETE | `/api/v1/buyer/favorites/[id]` | Elimina un favorito |
+| GET | `/api/v1/buyer/orders` | Lista órdenes del comprador |
+| GET | `/api/v1/buyer/orders/[id]` | Detalle de una orden |
+| POST | `/api/v1/buyer/checkout` | Convierte el carrito en orden |
 
 ### Endpoints para otras apps (autenticación con X-Service-Token)
 

@@ -4,7 +4,7 @@ import { use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Heart, ShoppingCart, Package, ArrowLeft, Truck, ShieldCheck, RefreshCw } from "lucide-react";
+import { Heart, ShoppingCart, Package, ArrowLeft, Truck, ShieldCheck, RefreshCw, Trash2 } from "lucide-react";
 import { useProduct, useFavoriteItems, useBuyerCart } from "@/hooks/use-buyer";
 import { useCartMutations } from "@/hooks/querys/cart/useCartMutations";
 import { useFavoriteMutations } from "@/hooks/querys/favorites/useFavoriteMutations";
@@ -29,9 +29,10 @@ export default function ProductDetailPage({ params }: Props) {
   const { productId } = use(params);
   const router = useRouter();
   const { data: product, isLoading, error } = useProduct(productId);
-  const { data: favorites } = useFavoriteItems();
+  const { data: favoritesResult } = useFavoriteItems();
+  const favorites = favoritesResult?.data;
   const { data: cart } = useBuyerCart();
-  const { addItem: addCartItem } = useCartMutations();
+  const { addItem: addCartItem, removeItem: removeCartItem } = useCartMutations();
   const { addItem: addFavoriteItem, removeItem: removeFavoriteItem } = useFavoriteMutations();
 
   if (isLoading) return <ProductDetailSkeleton />;
@@ -56,6 +57,11 @@ export default function ProductDetailPage({ params }: Props) {
   const isFavorite = favorites?.some((f) => f.productId === product.id) ?? false;
   const isInCart = cart?.items.some((i) => i.productId === product.id) ?? false;
   const existingFavorite = favorites?.find((f) => f.productId === product.id);
+
+  async function handleRemoveFromCart() {
+    const cartItem = cart?.items.find((i) => i.productId === product!.id);
+    if (cartItem) await removeCartItem.mutateAsync(cartItem.id);
+  }
 
   async function handleAddToCart() {
     await addCartItem.mutateAsync({
@@ -148,10 +154,20 @@ export default function ProductDetailPage({ params }: Props) {
           <div className="flex items-center gap-3">
             {product.isActive &&
               (isInCart ? (
-                <Button disabled className="gap-2 rounded-full px-6">
-                  <ShoppingCart className="size-4" />
-                  En el carrito
-                </Button>
+                <>
+                  <Button variant="outline" disabled className="gap-2 rounded-full px-6 border-primary text-primary">
+                    <ShoppingCart className="size-4" />
+                    En el carrito
+                  </Button>
+                  <button
+                    onClick={handleRemoveFromCart}
+                    disabled={removeCartItem.isPending}
+                    className="flex size-11 items-center justify-center rounded-full border border-border bg-card transition-colors hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                    title="Quitar del carrito"
+                  >
+                    <Trash2 className="size-5 text-muted-foreground" />
+                  </button>
+                </>
               ) : (
                 <Can action="cart.add">
                   {(granted) => (
