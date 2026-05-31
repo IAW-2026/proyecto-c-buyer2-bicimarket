@@ -64,7 +64,8 @@ export default function CheckoutPage() {
   }
 
   const sellerGroups = groupCartItemsBySeller(cart.items);
-  const totalShipping = sellerGroups.reduce((sum, g) => sum + g.shippingCost, 0);
+  const totalGrams = cart.items.reduce((s, i) => s + i.weightGramsSnapshot * i.quantity, 0);
+  const totalShipping = Math.round(800 + (totalGrams / 100) * 50) / 100;
   const selectedAddress = addresses?.find((a) => a.id === form.watch("shippingAddressId"));
 
   return (

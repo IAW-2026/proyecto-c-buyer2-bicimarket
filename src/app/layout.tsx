@@ -40,9 +40,9 @@ export default function RootLayout({
         className={`${ibmPlexSans.variable} ${instrumentSans.variable} ${jetbrainsMono.variable} h-full antialiased`}
       >
         <body className="min-h-full flex flex-col">
-          <ShopHeader />
           <QueryProvider>
             <TooltipProvider>
+              <ShopHeader />
               {children}
               <Toaster />
             </TooltipProvider>

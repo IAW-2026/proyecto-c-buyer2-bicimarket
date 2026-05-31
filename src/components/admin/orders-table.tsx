@@ -13,7 +13,7 @@ type OrderRow = {
   currency: string;
   createdAt: string;
   buyerProfile: { id: string; fullName: string; email: string };
-  _count: { items: number };
+  _count: { items: number; sellerGroups: number };
 };
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
@@ -80,6 +80,7 @@ export function OrdersTable({ statusFilter }: { statusFilter?: OrderStatus }) {
             <th className="px-4 py-3 text-left font-medium">Estado</th>
             <th className="px-4 py-3 text-right font-medium">Total</th>
             <th className="px-4 py-3 text-right font-medium">Items</th>
+            <th className="px-4 py-3 text-right font-medium">Vendedores</th>
             <th className="px-4 py-3 text-left font-medium">Fecha</th>
             <th className="px-4 py-3 text-left font-medium">Acciones</th>
           </tr>
@@ -101,6 +102,15 @@ export function OrdersTable({ statusFilter }: { statusFilter?: OrderStatus }) {
               </td>
               <td className="px-4 py-3 text-right font-medium">{fmt(order.totalCents)}</td>
               <td className="px-4 py-3 text-right text-muted-foreground">{order._count.items}</td>
+              <td className="px-4 py-3 text-right">
+                {order._count.sellerGroups > 1 ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    {order._count.sellerGroups}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">{order._count.sellerGroups}</span>
+                )}
+              </td>
               <td className="px-4 py-3 text-xs text-muted-foreground">
                 {new Date(order.createdAt).toLocaleDateString("es-AR")}
               </td>

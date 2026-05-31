@@ -52,6 +52,13 @@ type OrderDetail = {
   }>;
 };
 
+const SELLER_ACCENT = [
+  "border-l-blue-400",
+  "border-l-emerald-400",
+  "border-l-violet-400",
+  "border-l-amber-400",
+];
+
 const fmt = (cents: number) =>
   new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(cents / 100);
 
@@ -172,13 +179,28 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
 
       {/* Grupos por vendedor */}
       <div className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Items por vendedor
-        </p>
-        {order.sellerGroups.map((group) => (
-          <div key={group.id} className="rounded-xl border border-border/60 bg-card p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-mono text-muted-foreground">Vendedor: {group.sellerProfileId.slice(0, 10)}…</p>
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Items por vendedor
+          </p>
+          {order.sellerGroups.length > 1 && (
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+              {order.sellerGroups.length} vendedores
+            </span>
+          )}
+        </div>
+        {order.sellerGroups.map((group, index) => (
+          <div key={group.id} className={`rounded-xl border border-border/60 border-l-4 bg-card p-4 space-y-3 ${SELLER_ACCENT[index % SELLER_ACCENT.length]}`}>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[11px] font-bold text-muted-foreground shrink-0">
+                  {index + 1}
+                </span>
+                <div>
+                  <p className="text-xs font-semibold">Vendedor {index + 1}</p>
+                  <p className="text-[10px] font-mono text-muted-foreground break-all">{group.sellerProfileId}</p>
+                </div>
+              </div>
               <div className="flex gap-2">
                 <Badge variant="outline" className="text-[11px]">{group.status}</Badge>
                 {group.shippingStatus && (
@@ -207,9 +229,8 @@ export function OrderDetailView({ orderId }: { orderId: string }) {
               </tbody>
             </table>
             <div className="flex justify-end gap-4 text-xs text-muted-foreground pt-1">
-              <span>Envío: {fmt(group.shippingCostCents)}</span>
               <span className="font-medium text-foreground">
-                Subtotal vendedor: {fmt(group.itemsSubtotalCents + group.shippingCostCents)}
+                Subtotal vendedor: {fmt(group.itemsSubtotalCents)}
               </span>
             </div>
           </div>

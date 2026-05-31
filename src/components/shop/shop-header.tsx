@@ -6,6 +6,7 @@ import { useState, useEffect, Suspense } from "react";
 import { Bike, Search, Heart, Package, ShoppingCart, LayoutDashboard, Users } from "lucide-react";
 import { UserToggle } from "@/components/header/user-toggle";
 import { useRole } from "@/hooks/use-role";
+import { useBuyerCart } from "@/hooks/use-buyer";
 import { HEADER_CATEGORIES } from "@/lib/categories";
 import { cn } from "@/lib/utils";
 
@@ -62,6 +63,8 @@ export function ShopHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const role = useRole();
+  const { data: cart } = useBuyerCart();
+  const cartCount = cart?.itemCount ?? 0;
 
   const isShopRoute =
     pathname === "/" || pathname === "/shop" || pathname.startsWith("/shop/");
@@ -169,9 +172,14 @@ export function ShopHeader() {
               <button
                 onClick={() => handleIconNav("/cart")}
                 title="Carrito"
-                className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                className="relative flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
               >
                 <ShoppingCart className="size-4" />
+                {cartCount > 0 && (
+                  <span className="absolute right-1 top-1 flex size-3.5 items-center justify-center rounded-full bg-primary text-[8px] font-bold text-primary-foreground">
+                    {cartCount > 9 ? "9+" : cartCount}
+                  </span>
+                )}
               </button>
             </>
           )}

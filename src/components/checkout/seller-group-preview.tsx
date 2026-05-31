@@ -5,7 +5,6 @@ import type { CartItem } from "@/types/buyer";
 type SellerGroup = {
   sellerProfileId: string;
   items: CartItem[];
-  shippingCost: number;
 };
 
 type SellerGroupPreviewProps = {
@@ -19,14 +18,9 @@ export function SellerGroupPreview({ group }: SellerGroupPreviewProps) {
         <span className="text-sm font-semibold text-muted-foreground">
           Vendedor {group.sellerProfileId.slice(-6)}
         </span>
-        <div className="flex items-center gap-2">
-          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
-            {group.items.length} {group.items.length === 1 ? "item" : "items"}
-          </span>
-          <span className="text-xs text-muted-foreground">
-            Envío: <PriceDisplay amount={group.shippingCost} />
-          </span>
-        </div>
+        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+          {group.items.length} {group.items.length === 1 ? "item" : "items"}
+        </span>
       </div>
       <div className="divide-y divide-border/60">
         {group.items.map((item) => (
@@ -51,11 +45,7 @@ export function groupCartItemsBySeller(items: CartItem[]): SellerGroup[] {
   for (const item of items) {
     const id = item.sellerProfileId;
     if (!map.has(id)) {
-      map.set(id, {
-        sellerProfileId: id,
-        items: [],
-        shippingCost: 0,
-      });
+      map.set(id, { sellerProfileId: id, items: [] });
     }
     map.get(id)!.items.push(item);
   }

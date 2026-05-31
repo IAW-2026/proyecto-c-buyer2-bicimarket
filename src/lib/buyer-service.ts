@@ -40,14 +40,14 @@ export function groupItemsBySeller<
   }, {});
 }
 
-export function getShippingQuoteForSeller(
+export function getShippingQuoteForOrder(
   items: { weightGramsSnapshot: number; quantity: number }[],
 ) {
   const totalGrams = items.reduce(
     (sum, item) => sum + item.weightGramsSnapshot * item.quantity,
     0,
   );
-  // Mock: 800 ARS base + 50 per 100g
+  // Mock: base única de 800 ARS + 50 por cada 100g (independiente de cuántos vendedores)
   return Math.round(800 + (totalGrams / 100) * 50);
 }
 

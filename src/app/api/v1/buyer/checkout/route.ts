@@ -6,7 +6,7 @@ import {
   createPaymentSession,
   getOrCreateBuyerProfile,
   groupItemsBySeller,
-  getShippingQuoteForSeller,
+  getShippingQuoteForOrder,
 } from "@/lib/buyer-service";
 
 const checkoutSchema = z.object({
@@ -61,10 +61,12 @@ export async function POST(request: NextRequest) {
 
   const grouped = groupItemsBySeller(cart.items);
 
+  const shippingTotalCents = getShippingQuoteForOrder(cart.items);
+
   const groupedData = Object.entries(grouped).map(([sellerProfileId, items]) => ({
     sellerProfileId,
     items,
-    shippingCostCents: getShippingQuoteForSeller(items),
+    shippingCostCents: 0,
     weightGramsTotal: items.reduce(
       (sum, i) => sum + i.weightGramsSnapshot * i.quantity,
       0,
@@ -76,7 +78,6 @@ export async function POST(request: NextRequest) {
   }));
 
   const itemsTotalCents = groupedData.reduce((s, g) => s + g.itemsSubtotalCents, 0);
-  const shippingTotalCents = groupedData.reduce((s, g) => s + g.shippingCostCents, 0);
   const totalCents = itemsTotalCents + shippingTotalCents;
 
   const order = await prisma.order.create({

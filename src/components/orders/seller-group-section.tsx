@@ -1,4 +1,3 @@
-import { Truck } from "lucide-react";
 import { SellerGroupStatusBadge } from "@/components/shared/status-badge";
 import { ProductImage } from "@/components/shared/product-image";
 import { PriceDisplay } from "@/components/shared/price-display";
@@ -18,10 +17,6 @@ export function SellerGroupSection({ group, items }: SellerGroupSectionProps) {
           <span className="font-semibold text-xs text-muted-foreground">Vendedor {group.sellerProfileId.slice(-6)}</span>
           <SellerGroupStatusBadge status={group.status} />
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Truck className="size-3.5" />
-          <span>Envío: <PriceDisplay amount={group.shippingCostCents / 100} /></span>
-        </div>
       </div>
 
       <div className="divide-y divide-border/60">
@@ -39,9 +34,6 @@ export function SellerGroupSection({ group, items }: SellerGroupSectionProps) {
         ))}
       </div>
 
-      <div className="flex justify-end border-t border-border/60 px-4 py-2 text-xs text-muted-foreground">
-        Costo de envío: <PriceDisplay amount={group.shippingCostCents / 100} className="ml-1" />
-      </div>
     </div>
   );
 }

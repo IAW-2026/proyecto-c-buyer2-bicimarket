@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       currency: true,
       createdAt: true,
       buyerProfile: { select: { id: true, fullName: true, email: true } },
-      _count: { select: { items: true } },
+      _count: { select: { items: true, sellerGroups: true } },
     },
   });
 
