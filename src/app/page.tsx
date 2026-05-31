@@ -217,7 +217,7 @@ function HeroSection({ productCount, sellerCount }: { productCount?: number; sel
         <motion.div variants={fadeUp}>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
             <span className="size-1.5 rounded-full bg-primary" />
-            Marketplace argentino · {productCount ? `+${productCount}` : "+12.000"} productos
+            Marketplace argentino · {productCount ? `+${productCount}` : "+10"} productos
           </span>
         </motion.div>
 
@@ -231,8 +231,8 @@ function HeroSection({ productCount, sellerCount }: { productCount?: number; sel
         </motion.h1>
 
         <motion.p variants={fadeUp} className="max-w-md text-base text-muted-foreground">
-          Bicicletas, repuestos y accesorios de bicicleterías de todo el país. Logística propia,
-          envío hoy en CABA y AMBA, y pago en pesos con cuotas.
+          Bicicletas, repuestos y accesorios de bicicleterías de todo el país. 
+          Logística propia, envío hoy en CABA y AMBA, y pago en pesos con cuotas.
         </motion.p>
 
         <motion.div variants={fadeUp} className="flex items-center gap-4">
@@ -254,9 +254,9 @@ function HeroSection({ productCount, sellerCount }: { productCount?: number; sel
 
         <motion.div variants={fadeUp} className="flex items-center gap-8 border-t border-border/60 pt-6">
           {[
-            { value: sellerCount ? `+${sellerCount}` : "+340", label: "Bicicleterías vendiendo" },
-            { value: "24 h", label: "Envío promedio en CABA" },
-            { value: "4.8 ★", label: "Promedio de reseñas" },
+            { value: sellerCount ? `+${sellerCount}` : "10", label: "Bicicleterías vendiendo" },
+            { value: "24 h", label: "Soporte para tu compra" },
+            { value: "365", label: "Dias pedaleando con respaldo" },
           ].map((stat) => (
             <div key={stat.label}>
               <p className="font-heading text-xl font-bold">{stat.value}</p>
@@ -283,8 +283,8 @@ function HeroSection({ productCount, sellerCount }: { productCount?: number; sel
           >
             <Truck className="size-4 text-primary" />
             <div>
-              <p className="text-[10px] text-muted-foreground">Tu envío</p>
-              <p className="text-xs font-semibold">Llega hoy 18-20 hs</p>
+              <p className="text-xs font-semibold">Envios</p>
+              <p className="text-xs font-semibold">a todo el pais</p>
             </div>
           </motion.div>
 
@@ -304,8 +304,8 @@ function HeroSection({ productCount, sellerCount }: { productCount?: number; sel
               <Star className="size-3.5 fill-amber-500 text-amber-500" />
             </div>
             <div>
-              <p className="text-[10px] font-medium">BiciSur · Caballito</p>
-              <p className="text-[10px] text-muted-foreground">4,9 · 128 reseñas</p>
+              <p className="text-[10px] text-muted-foreground">Trabajamos con</p>
+              <p className="text-[10px] font-medium">Vendedores verificados</p>
             </div>
           </motion.div>
         </div>
