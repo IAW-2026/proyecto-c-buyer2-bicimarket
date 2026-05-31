@@ -34,7 +34,7 @@ export function FilterPanel({ filters }: FilterPanelProps) {
           ]}
           min={filters.priceRange.min}
           max={filters.priceRange.max}
-          onValueChange={(val: number[]) => filters.setPriceRange(val[0], val[1])}
+          onValueChange={(val: number | readonly number[]) => { const arr = Array.isArray(val) ? val : [val, val]; filters.setPriceRange(arr[0], arr[1]); }}
         />
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>{formatPrice(filters.filters.minPrice)}</span>
