@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateBuyerProfile } from "@/lib/buyer-service";
+import { createOrderStatusHistoryId } from "@/lib/entity-ids";
 import type { OrderStatus } from "@/generated/prisma";
 
 const CANCELLABLE_STATUSES: OrderStatus[] = [
@@ -53,6 +54,7 @@ export async function POST(
     }),
     prisma.orderStatusHistory.create({
       data: {
+        id: createOrderStatusHistoryId(),
         orderId,
         fromStatus: order.status,
         toStatus: "CANCELLED",

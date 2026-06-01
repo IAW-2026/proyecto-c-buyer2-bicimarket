@@ -4,6 +4,16 @@ import {
   SellerGroupStatus,
   ShippingStatus,
 } from "../src/generated/prisma";
+import {
+  createAddressId,
+  createCartId,
+  createCartItemId,
+  createFavoriteId,
+  createOrderId,
+  createOrderSellerGroupId,
+  createOrderItemId,
+  createOrderStatusHistoryId,
+} from "../src/lib/entity-ids";
 
 const prisma = new PrismaClient();
 
@@ -47,6 +57,7 @@ async function seedProfile(profileId: string, email: string) {
   } else {
     const address = await prisma.address.create({
       data: {
+        id: createAddressId(),
         buyerProfileId: profileId,
         alias: "Casa",
         street: "Av. Corrientes",
@@ -84,10 +95,12 @@ async function seedProfile(profileId: string, email: string) {
 
   await prisma.cart.create({
     data: {
+      id: createCartId(),
       buyerProfileId: profileId,
       items: {
         create: [
           {
+            id: createCartItemId(),
             productId: trek.id,
             sellerProfileId: trek.sellerId,
             productNameSnapshot: trek.name,
@@ -97,6 +110,7 @@ async function seedProfile(profileId: string, email: string) {
             weightGramsSnapshot: trek.weightGrams,
           },
           {
+            id: createCartItemId(),
             productId: casco.id,
             sellerProfileId: casco.sellerId,
             productNameSnapshot: casco.name,
@@ -115,7 +129,7 @@ async function seedProfile(profileId: string, email: string) {
     await prisma.favoriteItem.upsert({
       where: { buyerProfileId_productId: { buyerProfileId: profileId, productId: p.id } },
       update: {},
-      create: { buyerProfileId: profileId, productId: p.id },
+      create: { id: createFavoriteId(), buyerProfileId: profileId, productId: p.id },
     });
   }
 
@@ -138,6 +152,7 @@ async function seedProfile(profileId: string, email: string) {
 
   const order1 = await prisma.order.create({
     data: {
+      id: createOrderId(),
       buyerProfileId: profileId,
       paymentId: "pay_seed_completed_001",
       status: OrderStatus.COMPLETED,
@@ -152,6 +167,7 @@ async function seedProfile(profileId: string, email: string) {
 
   const group1 = await prisma.orderSellerGroup.create({
     data: {
+      id: createOrderSellerGroupId(),
       orderId: order1.id,
       sellerProfileId: "sel_mock_001",
       itemsSubtotalCents: itemsTotal1,
@@ -167,6 +183,7 @@ async function seedProfile(profileId: string, email: string) {
   await prisma.orderItem.createMany({
     data: [
       {
+        id: createOrderItemId(),
         orderId: order1.id,
         sellerGroupId: group1.id,
         productId: trek.id,
@@ -176,6 +193,7 @@ async function seedProfile(profileId: string, email: string) {
         weightGramsSnapshot: trek.weightGrams,
       },
       {
+        id: createOrderItemId(),
         orderId: order1.id,
         sellerGroupId: group1.id,
         productId: casco.id,
@@ -190,6 +208,7 @@ async function seedProfile(profileId: string, email: string) {
   await prisma.orderStatusHistory.createMany({
     data: [
       {
+        id: createOrderStatusHistoryId(),
         orderId: order1.id,
         fromStatus: "PENDING_PAYMENT",
         toStatus: "PAID",
@@ -198,6 +217,7 @@ async function seedProfile(profileId: string, email: string) {
         occurredAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
       },
       {
+        id: createOrderStatusHistoryId(),
         orderId: order1.id,
         fromStatus: "PAID",
         toStatus: "SHIPPED",
@@ -205,6 +225,7 @@ async function seedProfile(profileId: string, email: string) {
         occurredAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
       },
       {
+        id: createOrderStatusHistoryId(),
         orderId: order1.id,
         fromStatus: "SHIPPED",
         toStatus: "COMPLETED",
@@ -222,6 +243,7 @@ async function seedProfile(profileId: string, email: string) {
 
   const order2 = await prisma.order.create({
     data: {
+      id: createOrderId(),
       buyerProfileId: profileId,
       status: OrderStatus.PENDING_PAYMENT,
       itemsTotalCents: itemsTotal2,
@@ -234,6 +256,7 @@ async function seedProfile(profileId: string, email: string) {
 
   const group2 = await prisma.orderSellerGroup.create({
     data: {
+      id: createOrderSellerGroupId(),
       orderId: order2.id,
       sellerProfileId: totem.sellerId,
       itemsSubtotalCents: itemsTotal2,
@@ -246,6 +269,7 @@ async function seedProfile(profileId: string, email: string) {
 
   await prisma.orderItem.create({
     data: {
+      id: createOrderItemId(),
       orderId: order2.id,
       sellerGroupId: group2.id,
       productId: totem.id,

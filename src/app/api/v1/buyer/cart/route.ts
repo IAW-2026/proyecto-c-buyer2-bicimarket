@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateBuyerProfile, calculateCartTotals } from "@/lib/buyer-service";
+import { createCartId, createCartItemId } from "@/lib/entity-ids";
 
 const cartItemSchema = z.object({
   productId: z.string().min(1),
@@ -31,7 +32,7 @@ export async function GET() {
 
   if (!cart) {
     const newCart = await prisma.cart.create({
-      data: { buyerProfileId: profile.id },
+      data: { id: createCartId(), buyerProfileId: profile.id },
       include: { items: true },
     });
     return NextResponse.json({ ...newCart, totalCents: 0, itemCount: 0 });
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
   const profile = await getOrCreateBuyerProfile(userId);
   const cart = await prisma.cart.upsert({
     where: { buyerProfileId: profile.id },
-    create: { buyerProfileId: profile.id },
+    create: { id: createCartId(), buyerProfileId: profile.id },
     update: {},
   });
 
@@ -79,6 +80,7 @@ export async function POST(request: NextRequest) {
   const item = await prisma.cartItem.upsert({
     where: { cartId_productId: { cartId: cart.id, productId: parsed.data.productId } },
     create: {
+      id: createCartItemId(),
       cartId: cart.id,
       productId: parsed.data.productId,
       sellerProfileId: parsed.data.sellerProfileId,

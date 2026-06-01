@@ -8,6 +8,12 @@ import {
   groupItemsBySeller,
 } from "@/lib/buyer-service";
 import { getShippingQuotes, DEFAULT_PACKAGE_DIMS } from "@/lib/shipping-api";
+import {
+  createOrderId,
+  createOrderSellerGroupId,
+  createOrderItemId,
+  createOrderStatusHistoryId,
+} from "@/lib/entity-ids";
 
 const checkoutSchema = z.object({
   shippingAddressId: z.string().min(1),
@@ -110,6 +116,7 @@ export async function POST(request: NextRequest) {
 
   const order = await prisma.order.create({
     data: {
+      id: createOrderId(),
       buyerProfileId: profile.id,
       status: "PENDING_PAYMENT",
       itemsTotalCents,
@@ -121,14 +128,17 @@ export async function POST(request: NextRequest) {
     },
   });
 
+  const shippingPerGroup = Math.round(shippingTotalCents / groupedData.length);
+
   const createdGroups = await Promise.all(
     groupedData.map((g) =>
       prisma.orderSellerGroup.create({
         data: {
+          id: createOrderSellerGroupId(),
           orderId: order.id,
           sellerProfileId: g.sellerProfileId,
           itemsSubtotalCents: g.itemsSubtotalCents,
-          shippingCostCents: 0,
+          shippingCostCents: shippingPerGroup,
           weightGramsTotal: g.weightGramsTotal,
           status: "PENDING",
         },
@@ -138,6 +148,7 @@ export async function POST(request: NextRequest) {
 
   const orderItems = createdGroups.flatMap((group, index) =>
     groupedData[index].items.map((item) => ({
+      id: createOrderItemId(),
       orderId: order.id,
       sellerGroupId: group.id,
       productId: item.productId,
@@ -152,6 +163,7 @@ export async function POST(request: NextRequest) {
     prisma.orderItem.createMany({ data: orderItems }),
     prisma.orderStatusHistory.create({
       data: {
+        id: createOrderStatusHistoryId(),
         orderId: order.id,
         fromStatus: "",
         toStatus: "PENDING_PAYMENT",

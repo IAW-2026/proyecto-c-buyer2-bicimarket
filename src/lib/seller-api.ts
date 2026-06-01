@@ -35,11 +35,20 @@ export async function getSellerProducts(
     };
   }
 
-  const { data } = await client.get<PaginatedResponse<SellerProduct>>(
-    "/api/v1/products",
-    { params: { status: "active", ...params } },
-  );
-  return data;
+  try {
+    const { data } = await client.get<PaginatedResponse<SellerProduct>>(
+      "/api/v1/products",
+      { params: { status: "active", limit: 100, ...params } },
+    );
+    return data;
+  } catch (err) {
+    console.error("Error fetching products from Seller App, returning mock data");
+    console.error("Error details:", err);
+    return {
+      data: MOCK_PRODUCTS,
+      pagination: { total: MOCK_PRODUCTS.length, page: 1, limit: 20, has_more: false },
+    };
+  }
 }
 
 // GET /api/v1/products/{id}/availability — valida que el producto esté activo y obtiene precio/peso
@@ -57,7 +66,7 @@ export async function getProductAvailability(
       price_cents: mock.price_cents,
       weight_grams: mock.weight_grams,
       seller_profile_id: mock.seller_profile_id,
-      seller_name: mock.seller_name,
+      seller_name: mock.seller_name ?? mock.seller_profile_id,
     };
   }
 

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateBuyerProfile } from "@/lib/buyer-service";
+import { createFavoriteId } from "@/lib/entity-ids";
 
 const favoriteSchema = z.object({
   productId: z.string().min(1),
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest) {
         productId: parsed.data.productId,
       },
     },
-    create: { buyerProfileId: profile.id, productId: parsed.data.productId },
+    create: { id: createFavoriteId(), buyerProfileId: profile.id, productId: parsed.data.productId },
     update: {},
   });
 

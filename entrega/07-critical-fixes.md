@@ -1,139 +1,61 @@
 # 07 — Critical Fix List
-> Audit generated: 2026-05-31 | Delivery: 2026-06-01 (TOMORROW) | Defense: 2026-06-04 / 2026-06-08
 
-Time available before delivery: ~24 hours. Fix high-severity issues first.
-
----
-
-# Must Fix Before Submission
-
-These issues directly cost points or prevent the app from functioning.
+> Prioritized by grading impact. Fix in this order.
 
 ---
 
-## FIX-01 — Create `middleware.ts` for Clerk (YA ESTA)
-
-**Severity**: CRITICAL
-**Affected files**: Project root (create new file)
-**Estimated effort**: 20 minutes
-**Grading impact**: Auth broken in production → evaluator cannot log in → 0 points on auth-dependent features
-
-```typescript
-// middleware.ts (project root, same level as package.json)
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-
-const isPublicRoute = createRouteMatcher([
-  "/",
-  "/shop(.*)",
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-  "/api/v1/orders(.*)",
-  "/api/products(.*)",
-  "/api/health(.*)",
-  "/api/docs(.*)",
-]);
-
-export default clerkMiddleware(async (auth, req) => {
-  if (!isPublicRoute(req)) {
-    await auth.protect();
-  }
-});
-
-export const config = {
-  matcher: ["/((?!.*\\..*|_next).*)", "/", "/(api|trpc)(.*)"],
-};
-```
+# MUST FIX BEFORE SUBMISSION
 
 ---
 
-## FIX-02 — Add Deploy URL and Credentials to README (PREGUNTAR ADMIN)
+## FIX-01: Replace Mock Payment Function in Checkout (INTEGRACION??)
 
-**Severity**: CRITICAL
-**Affected files**: `README.md`
-**Estimated effort**: 10 minutes (after deploying)
-**Grading impact**: Explicit rubric requirement — "link al deploy y credenciales"
+**Severity:** CRITICAL  
+**Affected Files:** `src/app/api/v1/buyer/checkout/route.ts` (line 168), `src/lib/buyer-service.ts` (lines 44-50)  
+**Estimated Effort:** 30 minutes  
+**Grading Impact:** Any end-to-end checkout demo will fail. Professor cannot complete the purchase flow. This alone could fail the demo.
 
-Add this section at the TOP of README.md (before anything else):
+**What to do:**
 
-```markdown
-## 🚀 Deploy
+1. In `src/app/api/v1/buyer/checkout/route.ts`, remove the import of `createPaymentSession` from `buyer-service` and add import from `payments-api`:
 
-- **URL**: https://YOUR-APP.vercel.app
-- **Admin**: email `admin@test.com` | password `Admin1234!` (o instrucciones de cómo obtener un admin)
-- **Comprador**: email `comprador@test.com` | password `Comprador1234!`
-```
-
----
-
-## FIX-03 — Create `.env.example` (YA ESTA)
-
-**Severity**: CRITICAL
-**Affected files**: `.env.example` (create new file), `.gitignore` (add exception)
-**Estimated effort**: 15 minutes
-**Grading impact**: Explicit rubric requirement
-
-Create `.env.example`:
-```
-DATABASE_URL=
-DIRECT_URL=
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
-CLERK_SECRET_KEY=
-SELLER_APP_URL=
-BUYER_TO_SELLER_SERVICE_TOKEN=
-SHIPPING_APP_URL=
-BUYER_TO_SHIPPING_SERVICE_TOKEN=
-PAYMENTS_APP_URL=
-BUYER_TO_PAYMENTS_SERVICE_TOKEN=
-PAYMENTS_TO_BUYER_SERVICE_TOKEN=
-SHIPPING_TO_BUYER_SERVICE_TOKEN=
-SELLER_TO_BUYER_SERVICE_TOKEN=
-```
-
-Add to `.gitignore` (so the example CAN be committed):
-```
-# CHANGE THIS LINE:
-.env*
-# TO:
-.env*
-!.env.example
-```
-
----
-
-## FIX-04 — Fix Payment Session to Call Payments API (INTEGRACION)
-
-**Severity**: CRITICAL
-**Affected files**: `src/lib/buyer-service.ts`, `src/app/api/v1/buyer/checkout/route.ts`
-**Estimated effort**: 45 minutes
-**Grading impact**: Checkout is broken — users are redirected to `https://example-payment.local/...`
-
-In `src/lib/buyer-service.ts`, the `createPaymentSession` stub is:
-```typescript
-// BROKEN — replace this:
-export async function createPaymentSession(orderId: string, totalCents: number) {
-  return {
-    paymentId: `pay_${orderId}`,
-    paymentUrl: `https://example-payment.local/checkout?order=${orderId}`,
-    totalCents,
-  };
-}
-```
-
-Replace with a call to the real payments API. In `src/app/api/v1/buyer/checkout/route.ts` after order creation, replace the `createPaymentSession(order.id, totalCents)` call with:
-
-```typescript
+```ts
+// REMOVE:
+import { createPaymentSession, ... } from "@/lib/buyer-service";
+// ADD:
 import { createPayment } from "@/lib/payments-api";
+```
 
-// After order creation...
+2. Replace the call at line 168:
+
+```ts
+// REMOVE:
+const payment = await createPaymentSession(order.id, totalCents);
+
+// ADD:
 const payment = await createPayment({
   order_id: order.id,
+  buyer_clerk_user_id: userId,
   buyer_profile_id: profile.id,
   amount_cents: totalCents,
   currency: "ARS",
+  items_summary: groupedData.map((g) => ({
+    seller_profile_id: g.sellerProfileId,
+    subtotal_cents: g.itemsSubtotalCents,
+    shipping_cost_cents: 0, // update after FIX-03
+  })),
   idempotency_key: crypto.randomUUID(),
-  return_url: parsed.data.returnUrl,
+  return_urls: {
+    success: `${process.env.NEXT_PUBLIC_APP_URL}/orders/${order.id}?payment=success`,
+    failure: `${process.env.NEXT_PUBLIC_APP_URL}/orders/${order.id}?payment=failure`,
+    pending: `${process.env.NEXT_PUBLIC_APP_URL}/orders/${order.id}?payment=pending`,
+  },
 });
+```
 
+3. Update the order update to use correct field names from `PaymentSession` type:
+
+```ts
 await prisma.order.update({
   where: { id: order.id },
   data: { paymentId: payment.payment_id },
@@ -142,274 +64,332 @@ await prisma.order.update({
 return NextResponse.json({ paymentUrl: payment.checkout_url, orderId: order.id });
 ```
 
-The `createPayment()` in `lib/payments-api.ts` already has a mock fallback when `PAYMENTS_APP_URL` is not set, so this will work in both environments.
+4. Add `NEXT_PUBLIC_APP_URL=https://proyecto-c-buyer2-bicimarket.vercel.app` to `.env` and `.env.example`.
+
+5. Delete `createPaymentSession` from `src/lib/buyer-service.ts`.
 
 ---
 
-## FIX-05 — Add Admin Sidebar to Admin Layout (LISTO)
+## FIX-02: Configure Missing Service Tokens (INTEGRACION DESPUES)
 
-**Severity**: HIGH
-**Affected files**: `src/app/admin/layout.tsx`
-**Estimated effort**: 30 minutes
-**Grading impact**: Admin panel appears broken (no navigation)
+**Severity:** CRITICAL  
+**Affected Files:** `.env` (local and Vercel dashboard)  
+**Estimated Effort:** 15 minutes (coordination with other teams required)  
+**Grading Impact:** Other apps cannot notify Buyer App of status changes. Any integration demo will show 500 errors on Buyer's inter-app endpoints.
 
-The `AdminSidebar` component exists at `src/components/admin/admin-sidebar.tsx`. Wire it into the layout:
+**What to do:**
 
-```typescript
-// src/app/admin/layout.tsx
-import { requireAdmin } from "@/lib/admin-auth";
-import { AdminSidebar } from "@/components/admin/admin-sidebar";
-import { AdminHeader } from "@/components/admin/admin-header";
+Uncomment and fill in `.env`:
 
-export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  await requireAdmin();
-
-  return (
-    <div className="flex h-full">
-      <AdminSidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <AdminHeader />
-        <main className="flex-1 overflow-y-auto">
-          {children}
-        </main>
-      </div>
-    </div>
-  );
-}
+```env
+BUYER_TO_SHIPPING_SERVICE_TOKEN=<agree on value with Enrique Seitz>
+BUYER_TO_PAYMENTS_SERVICE_TOKEN=<agree on value with Rocco Paoloni>
+PAYMENTS_TO_BUYER_SERVICE_TOKEN=<same value as Rocco's PAYMENTS_TO_BUYER token>
+SHIPPING_TO_BUYER_SERVICE_TOKEN=<same value as Enrique's SHIPPING_TO_BUYER token>
+SELLER_TO_BUYER_SERVICE_TOKEN=<same value as Pierino's SELLER_TO_BUYER token>
 ```
 
-Check `AdminSidebar` and `AdminHeader` components first to ensure they don't have unexpected dependencies.
-
----
-
-## FIX-06 — Deploy the App to Vercel (YA ESTA)
-
-**Severity**: CRITICAL
-**Affected files**: Vercel dashboard
-**Estimated effort**: 1–2 hours
-**Grading impact**: App not deployed → direct rubric failure
-
-Steps:
-1. Push current code to GitHub
-2. Create new Vercel project from GitHub repo
-3. Add all env vars from `.env` to Vercel Settings → Environment Variables
-4. Deploy
-5. Copy the Vercel URL into README.md
-
-**BEFORE deploying**: Fix FIX-01 (middleware.ts) first, or auth will be broken on Vercel.
-
----
-
-## FIX-07 — Add Seed Script to package.json (LISTO)
-
-**Severity**: HIGH
-**Affected files**: `package.json`
-**Estimated effort**: 10 minutes
-**Grading impact**: App will be empty in production if seed can't be run
-
-Add to `package.json`:
-```json
-"scripts": {
-  "seed": "tsx prisma/seed.ts"
-}
+Also fix the trailing space in `PAYMENTS_APP_URL`:
+```env
+PAYMENTS_APP_URL=https://proyecto-c-payments-bicimarket.vercel.app
 ```
 
-Also add to `package.json` for Prisma to auto-run seed:
-```json
-"prisma": {
-  "seed": "tsx prisma/seed.ts"
-}
-```
-
-After deploying, run the seed against production: `DATABASE_URL=<production-url> npx tsx prisma/seed.ts`
+Add all these to Vercel dashboard Environment Variables. Redeploy after updating.
 
 ---
 
-# Should Fix Before Defense
+## FIX-03: Fix ShippingCostCents Per Seller Group (LISTO)
 
-Important for the defense but not blocking for delivery.
+**Severity:** IMPORTANT  
+**Affected Files:** `src/app/api/v1/buyer/checkout/route.ts` (line 132)  
+**Estimated Effort:** 20 minutes  
+**Grading Impact:** Admin panel and API responses will show ARS 0 shipping per seller group even when shipping was charged. A professor examining an order in the DB will see this.
 
----
+**What to do:**
 
-## FIX-08 — Add Pagination to List APIs (LISTO)
+The mock shipping response provides `total_net_cents` as a combined total. Until the shipping API provides per-seller costs, divide the total equally:
 
-**Severity**: HIGH
-**Affected files**: All `route.ts` in `/api/v1/buyer/orders/`, `/api/admin/orders/`, `/api/admin/buyers/`, `/api/admin/carts/`
-**Estimated effort**: 2 hours
-**Grading impact**: Direct spec violation on a graded requirement
+```ts
+const shippingPerGroup = Math.round(shippingTotalCents / groupedData.length);
 
-Example fix for `GET /api/v1/buyer/orders`:
-```typescript
-export async function GET(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const { searchParams } = req.nextUrl;
-  const page = Math.max(1, Number(searchParams.get("page") ?? 1));
-  const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? 20)));
-  const skip = (page - 1) * limit;
-
-  const profile = await getOrCreateBuyerProfile(userId);
-  
-  const [orders, total] = await Promise.all([
-    prisma.order.findMany({
-      where: { buyerProfileId: profile.id },
-      orderBy: { createdAt: "desc" },
-      skip,
-      take: limit,
-      include: { items: true, sellerGroups: true },
+const createdGroups = await Promise.all(
+  groupedData.map((g) =>
+    prisma.orderSellerGroup.create({
+      data: {
+        orderId: order.id,
+        sellerProfileId: g.sellerProfileId,
+        itemsSubtotalCents: g.itemsSubtotalCents,
+        shippingCostCents: shippingPerGroup, // was: 0
+        weightGramsTotal: g.weightGramsTotal,
+        status: "PENDING",
+      },
     }),
-    prisma.order.count({ where: { buyerProfileId: profile.id } }),
-  ]);
-
-  return NextResponse.json({
-    data: orders,
-    pagination: { total, page, limit, has_more: skip + orders.length < total },
-  });
-}
-```
-
----
-
-## FIX-09 — Fix Weight Snapshot in Shop Add-to-Cart
-
-**Severity**: HIGH
-**Affected files**: `src/app/shop/page.tsx:33`
-**Estimated effort**: 30 minutes
-**Grading impact**: Shipping quotes use 0-gram packages — breaks real Shipping App integration
-
-In `src/app/shop/page.tsx`:
-```typescript
-// WRONG:
-weightGramsSnapshot: 0,
-
-// FIX: Make sure Product type has weight_grams field
-weightGramsSnapshot: product.weightGrams ?? 0,
-```
-
-Also update `src/app/api/products/route.ts` to map `weight_grams` from `SellerProduct` to `Product`:
-```typescript
-function toProduct(p: SellerProduct): Product {
-  return {
-    ...
-    weightGrams: p.weight_grams,
-  };
-}
-```
-
----
-
-## FIX-10 — Fix Shipping Cost Per Seller Group (LISTO)
-
-**Severity**: MEDIUM
-**Affected files**: `src/app/api/v1/buyer/checkout/route.ts:118`
-**Estimated effort**: 30 minutes
-**Grading impact**: Per-group shipping shows $0 in order detail
-
-Change in checkout route:
-```typescript
-// WRONG:
-shippingCostCents: 0,
-
-// FIX:
-shippingCostCents: quoteResponse.quotes.find(
-  (q) => q.seller_profile_id === g.sellerProfileId
-)?.cost_cents ?? 0,
-```
-
----
-
-## FIX-11 — Standardize Error Response Format (LISTO)
-
-**Severity**: MEDIUM
-**Affected files**: `src/app/api/v1/buyer/checkout/route.ts` and others with inconsistent format
-**Estimated effort**: 1 hour
-**Grading impact**: API contract inconsistency
-
-In checkout route, change:
-```typescript
-// WRONG:
-return NextResponse.json({ error: "El carrito está vacío" }, { status: 400 });
-
-// FIX:
-return NextResponse.json(
-  { error: { code: "CART_EMPTY", message: "El carrito está vacío" } },
-  { status: 400 }
+  ),
 );
 ```
 
 ---
 
-## FIX-12 — Fix Price Units (Pesos vs Centavos) ()
+## FIX-04: Fix Cart POST to Resolve Price Server-Side
 
-**Severity**: HIGH (for real integration, deferred for now)
-**Affected files**: `src/lib/seller-api.ts`, `src/types/inter-service.ts`, `src/app/shop/page.tsx`
-**Estimated effort**: 2 hours
-**Grading impact**: All monetary values will be 100x wrong when real Seller App is connected
+**Severity:** IMPORTANT  
+**Affected Files:** `src/app/api/v1/buyer/cart/route.ts`  
+**Estimated Effort:** 45 minutes  
+**Grading Impact:** A professor testing the cart API directly can send any price. This is an obvious security flaw that will be noticed.
 
-This is high risk for the defense but acceptable for delivery since mock data works. Before connecting real Seller App:
-1. Rename `price` → `price_cents` in `SellerProduct` type
-2. Update mock data to use centavo values (multiply all by 100)
-3. Remove `* 100` conversion in `shop/page.tsx`
-4. Update `PriceDisplay` component to divide by 100 for display
+**What to do:**
 
----
+Replace client-supplied product data with server-resolved data:
 
-# Nice To Have
+```ts
+// New minimal schema:
+const cartItemSchema = z.object({
+  productId: z.string().min(1),
+  quantity: z.number().int().positive().max(10),
+});
 
-Minor polish items.
+// In POST handler, after validating schema:
+const availability = await getProductAvailability(parsed.data.productId);
+if (!availability || availability.status !== "active") {
+  return NextResponse.json(
+    { error: { code: "PRODUCT_NOT_ACTIVE", message: "El producto no está disponible", details: {} } },
+    { status: 409 }
+  );
+}
+```
 
----
+Then use `availability.price_cents`, `availability.weight_grams`, `availability.seller_profile_id`, etc. to build the cart item.
 
-## FIX-13 — Fix Typos in Error Pages
-
-**Files**: `src/app/not-found.tsx`, `src/app/error.tsx`
-**Effort**: 5 minutes
-
-- "La pagina" → "La página"
-- "Algo salio mal" → "Algo salió mal"
-- "Ocurrio" → "Ocurrió"
-
----
-
-## FIX-14 — Fix Page Metadata Title
-
-**Files**: `src/app/layout.tsx:27`
-**Effort**: 2 minutes
-
-Change `title: "Marketplace App"` to `title: "BiciMarket — Buyer App"`.
+Note: If Seller App is not configured, `getProductAvailability` returns a mock. The mock doesn't need to change — prices will be resolved from the mock catalog server-side, not from the client.
 
 ---
 
-## FIX-15 — Add State Transition Validation to Order Status PATCH
+## FIX-05: Fix Order Cancellation to Reject PAID Orders
 
-**Files**: `src/app/api/v1/orders/[orderId]/route.ts`
-**Effort**: 30 minutes
+**Severity:** IMPORTANT  
+**Affected Files:** `src/app/api/v1/buyer/orders/[orderId]/cancel/route.ts` (line 7-11)  
+**Estimated Effort:** 5 minutes  
+**Grading Impact:** A professor testing the cancel endpoint with a paid order can demonstrate incorrect behavior.
 
-Add a transition matrix and reject invalid transitions with 409.
+**What to do:**
+
+```ts
+// Change:
+const CANCELLABLE_STATUSES: OrderStatus[] = [
+  "PENDING_PAYMENT",
+  "PAID",         // remove this
+  "PAYMENT_FAILED",
+];
+
+// To:
+const CANCELLABLE_STATUSES: OrderStatus[] = [
+  "PENDING_PAYMENT",
+  "PAYMENT_FAILED",
+];
+```
 
 ---
 
-## FIX-16 — Remove `--webpack` Flag from Build Script
+## FIX-06: Fix Profile PATCH to Support default_shipping_address_id
 
-**Files**: `package.json`
-**Effort**: 2 minutes
+**Severity:** IMPORTANT  
+**Affected Files:** `src/app/api/v1/buyer/profile/route.ts`  
+**Estimated Effort:** 10 minutes  
+**Grading Impact:** Profile management is incomplete without this. The UI address selector needs this to set a default.
 
-Change `"build": "prisma generate && next build --webpack"` to `"build": "prisma generate && next build"`.
+**What to do:**
+
+```ts
+const updateProfileSchema = z.object({
+  fullName: z.string().min(2).optional(),
+  phone: z.string().optional(),
+  defaultShippingAddressId: z.string().optional().nullable(),
+});
+```
+
+And update the prisma call to include the new field.
 
 ---
 
-## Priority Order for the Next 24 Hours
+## FIX-07: Add middleware.ts for Clerk Route Protection
 
-Given delivery is tomorrow:
+**Severity:** IMPORTANT  
+**Affected Files:** Create `src/middleware.ts`  
+**Estimated Effort:** 10 minutes  
+**Grading Impact:** Shows awareness of Clerk best practices. A professor checking the Clerk setup will expect this.
 
-1. **FIX-06**: Deploy to Vercel (prerequisite for everything else)
-2. **FIX-01**: Add middleware.ts (must do before deploying)
-3. **FIX-02**: Add deploy URL and credentials to README
-4. **FIX-03**: Create .env.example
-5. **FIX-04**: Fix payment session (checkout must work for demo)
-6. **FIX-05**: Wire admin sidebar
-7. **FIX-07**: Add seed script, run seed on production DB
-8. **FIX-08**: Add pagination (if time permits — 2 hours)
-9. **FIX-09 + FIX-10**: Weight and shipping cost fixes (30 min each)
-10. **FIX-13 + FIX-14**: Typos and title (10 min total)
+**What to do:**
+
+Create `src/middleware.ts`:
+
+```ts
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+
+const isProtectedRoute = createRouteMatcher([
+  "/(auth)(.*)",
+  "/admin(.*)",
+]);
+
+export default clerkMiddleware(async (auth, req) => {
+  if (isProtectedRoute(req)) await auth.protect();
+});
+
+export const config = {
+  matcher: [
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/(api|trpc)(.*)",
+  ],
+};
+```
+
+---
+
+## FIX-08: Align Seed Prices with Mock Products
+
+**Severity:** MINOR  
+**Affected Files:** `prisma/seed.ts`  
+**Estimated Effort:** 10 minutes  
+**Grading Impact:** Seeded orders will show different prices than the shop. Looks inconsistent in a demo.
+
+**What to do:**
+
+Update `MOCK_PRODUCTS` in `seed.ts` to match `seller-api.ts` prices:
+
+```ts
+const MOCK_PRODUCTS = [
+  { id: "prd_mock_001", name: "Bicicleta de montaña Trek Marlin 5", price: 130000000, weightGrams: 13500, ... },
+  { id: "prd_mock_002", name: "Bicicleta urbana Totem City", price: 1800000000, weightGrams: 11000, ... },
+  { id: "prd_mock_003", name: "Casco ciclismo Giro Register", price: 5500000, weightGrams: 320, ... },
+];
+```
+
+After changing, delete existing seeded orders and re-run `npm run seed`.
+
+---
+
+## FIX-09: Fix 404 Page Typo
+
+**Severity:** MINOR  
+**Affected Files:** `src/app/not-found.tsx`  
+**Estimated Effort:** 1 minute  
+**Grading Impact:** Small but visible. Shows attention to detail.
+
+```ts
+// Change:
+"La pagina que buscas no existe."
+// To:
+"La página que buscas no existe."
+```
+
+---
+
+## FIX-10: Fix Admin API Error Format
+
+**Severity:** MINOR  
+**Affected Files:** `src/lib/admin-auth.ts` (lines 13, 16)  
+**Estimated Effort:** 5 minutes  
+**Grading Impact:** Inconsistent with rest of API. Minor.
+
+```ts
+// Change line 13:
+return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+// To:
+return NextResponse.json({ error: { code: "UNAUTHORIZED", message: "No autorizado", details: {} } }, { status: 401 });
+
+// Change line 16:
+return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+// To:
+return NextResponse.json({ error: { code: "FORBIDDEN", message: "Acceso denegado", details: {} } }, { status: 403 });
+```
+
+---
+
+# SHOULD FIX BEFORE DEFENSE
+
+---
+
+## FIX-11: Delete Vim Swap File
+
+**Severity:** MINOR  
+**Affected Files:** `src/components/admin/.orders-table.tsx.swp`  
+**Estimated Effort:** 1 minute  
+
+```bash
+rm "src/components/admin/.orders-table.tsx.swp"
+echo "*.swp" >> .gitignore
+git rm --cached "src/components/admin/.orders-table.tsx.swp"
+```
+
+---
+
+## FIX-12: Move Admin/Products API Routes Under /api/v1/
+
+**Severity:** MINOR  
+**Affected Files:** `src/app/api/admin/`, `src/app/api/products/`  
+**Estimated Effort:** 30 minutes (+ update all references)  
+**Notes:** Move to `src/app/api/v1/admin/` and `src/app/api/v1/products/` and update all fetch calls. Low priority — only matters if professor checks URL conventions strictly.
+
+---
+
+## FIX-13: Add Idempotency-Key to Checkout
+
+**Severity:** MINOR  
+**Affected Files:** `src/app/api/v1/buyer/checkout/route.ts`  
+**Estimated Effort:** 30 minutes  
+**Notes:** Read `Idempotency-Key` header, store with order, return existing order on retry.
+
+---
+
+# NICE TO HAVE
+
+---
+
+## FIX-14: Add Server-Side Pagination to Shop
+
+**Severity:** MINOR  
+**Affected Files:** `src/app/api/products/route.ts`, `src/lib/seller-api.ts`, shop page  
+**Estimated Effort:** 1 hour  
+
+---
+
+## FIX-15: Add X-Request-Id Propagation
+
+**Severity:** MINOR  
+**Affected Files:** `src/lib/service-client.ts`  
+**Estimated Effort:** 15 minutes  
+
+---
+
+## FIX-16: Add Retry Logic to Service Client
+
+**Severity:** MINOR  
+**Affected Files:** `src/lib/service-client.ts`  
+**Estimated Effort:** 30 minutes  
+**Notes:** Install `axios-retry` and configure 3 retries with exponential backoff.
+
+---
+
+## FIX-17: Add ID Prefixes to Prisma Models
+
+**Severity:** MINOR  
+**Affected Files:** All API route handlers (generation), `src/lib/` helpers  
+**Estimated Effort:** 2 hours  
+**Notes:** Create `createId(prefix)` helper and use before Prisma inserts.
+
+---
+
+## Priority Summary Table
+
+| Fix | Severity | Effort | Impact |
+|---|---|---|---|
+| FIX-01: Payment function | CRITICAL | 30 min | Checkout demo works |
+| FIX-02: Service tokens | CRITICAL | 15 min | Inter-app integration works |
+| FIX-03: Shipping cost per group | IMPORTANT | 20 min | Correct data in orders |
+| FIX-04: Cart server-side price | IMPORTANT | 45 min | Security compliance |
+| FIX-05: Cancel PAID orders | IMPORTANT | 5 min | Spec compliance |
+| FIX-06: Profile default address | IMPORTANT | 10 min | Feature completeness |
+| FIX-07: middleware.ts | IMPORTANT | 10 min | Auth best practice |
+| FIX-08: Seed prices | MINOR | 10 min | Demo coherence |
+| FIX-09: 404 typo | MINOR | 1 min | Polish |
+| FIX-10: Admin error format | MINOR | 5 min | API consistency |
+| FIX-11: Delete swap file | MINOR | 1 min | Repo hygiene |

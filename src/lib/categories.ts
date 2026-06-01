@@ -46,7 +46,6 @@ export const BIKE_TYPES: BikeTypeDef[] = [
   { id: "urban", label: "Urban", keywords: ["urban", "urbana", "city", "ciudad", "fixie", "commuter"] },
   { id: "kids", label: "Kids", keywords: ["kids", "niño", "niña", "infantil", "junior", "rodado 12", "rodado 16", "rodado 20"] },
   { id: "bmx", label: "BMX", keywords: ["bmx", "freestyle", "dirt", "flatland", "pump track"] },
-  { id: "electric", label: "Eléctrica", keywords: ["eléctrica", "electrica", "ebike", "e-bike", "e bike", "motor", "batería", "pedelec"] },
 ];
 
 export function matchesBikeType(

@@ -1,5 +1,6 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { createBuyerId } from "@/lib/entity-ids";
 
 export async function getOrCreateBuyerProfile(clerkUserId: string) {
   const existing = await prisma.buyerProfile.findUnique({
@@ -15,7 +16,7 @@ export async function getOrCreateBuyerProfile(clerkUserId: string) {
   const email = clerkUser?.emailAddresses[0]?.emailAddress ?? "";
 
   return prisma.buyerProfile.create({
-    data: { clerkUserId, fullName, email },
+    data: { id: createBuyerId(), clerkUserId, fullName, email },
   });
 }
 

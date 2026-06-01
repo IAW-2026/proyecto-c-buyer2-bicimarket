@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateBuyerProfile } from "@/lib/buyer-service";
+import { createAddressId } from "@/lib/entity-ids";
 
 const addressSchema = z.object({
   alias: z.string().min(2),
@@ -88,6 +89,7 @@ export async function POST(request: NextRequest) {
 
   const address = await prisma.address.create({
     data: {
+      id: createAddressId(),
       buyerProfileId: profile.id,
       ...parsed.data,
       isDefault: parsed.data.isDefault ?? false,

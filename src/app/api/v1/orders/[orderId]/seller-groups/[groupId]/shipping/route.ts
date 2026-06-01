@@ -12,6 +12,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { SellerGroupStatus, OrderStatus, ShippingStatus } from "@/generated/prisma";
 import { validateServiceToken } from "@/lib/service-auth";
+import { createOrderStatusHistoryId } from "@/lib/entity-ids";
 
 const patchSchema = z.object({
   status: z.enum(["preparing", "ready_to_ship", "in_transit", "delivered"]),
@@ -128,6 +129,7 @@ export async function PATCH(
         }),
         prisma.orderStatusHistory.create({
           data: {
+            id: createOrderStatusHistoryId(),
             orderId,
             fromStatus: currentOrder.status,
             toStatus: newOrderStatus,

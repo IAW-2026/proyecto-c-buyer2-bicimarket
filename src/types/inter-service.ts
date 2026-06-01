@@ -13,16 +13,20 @@
 export type SellerProduct = {
   id: string;
   title: string;
-  description: string;
+  description?: string;
+  brand?: string;
+  model?: string;
   price_cents: number;
+  currency?: string;
   weight_grams: number;
+  dimensions_cm?: { length: number; width: number; height: number };
   seller_profile_id: string;
-  seller_name: string;
+  seller_name?: string;
   main_image_url: string | null;
   status: "active" | "draft" | "inactive";
   category: "mtb" | "road" | "urban" | "kids" | "bmx" | "parts" | "accessories" | "indumentaria";
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 };
 
 export type SellerProductsParams = {

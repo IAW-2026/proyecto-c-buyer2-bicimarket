@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdminApi } from "@/lib/admin-auth";
 import { prisma } from "@/lib/prisma";
+import { createOrderStatusHistoryId } from "@/lib/entity-ids";
 import type { OrderStatus } from "@/generated/prisma/client";
 
 const patchSchema = z.object({
@@ -89,6 +90,7 @@ export async function PATCH(
     }),
     prisma.orderStatusHistory.create({
       data: {
+        id: createOrderStatusHistoryId(),
         orderId,
         fromStatus: order.status,
         toStatus: newStatus,

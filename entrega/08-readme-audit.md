@@ -1,148 +1,129 @@
 # 08 — README Audit
-> Audit generated: 2026-05-31
 
 ---
 
-## Current State
+## Current README Assessment
 
-The README.md exists and contains:
-- App description (what BiciMarket is, the four-app architecture)
-- Table of apps with port numbers
-- Setup instructions (npm install, env vars, prisma, npm run dev)
-- Project folder structure (detailed)
-- Routes table
-- API endpoints table (both UI and inter-service)
-- Tech stack table
-- Useful commands section
-- Documentation index (references to `doc referencias/` files)
+File: `README.md`
 
 ---
 
-## Assessment Against Rubric
+## ✅ What's Present
 
-The assignment says: "README breve y conciso, debe incluir: descripción de la app, **link al deploy**, y **credenciales o instrucciones para acceder con cada tipo de usuario disponible** (ej: administrador, usuario final). No debe ser extenso."
-
-| Requirement | Present? | Notes |
+| Requirement | Status | Notes |
 |---|---|---|
-| App description | ✅ YES | Good — explains what the app does |
-| **Deploy link** | ❌ MISSING | No URL to Vercel deployment |
-| **Admin credentials** | ❌ MISSING | No email/password or how to get admin access |
-| **Buyer credentials** | ❌ MISSING | No test user credentials |
-| Concise | ⚠️ FAILING | README is very long (~220 lines) — rubric says "breve y conciso" |
+| App description | ✅ | Clear one-paragraph description of what BiciMarket Buyer App does |
+| Deploy link | ✅ | `https://proyecto-c-buyer2-bicimarket.vercel.app/` |
+| Admin credentials | ✅ | `admin@test.com` / `Admin1234!` |
+| Buyer credentials | ✅ | `comprador@test.com` / `Comprador1234!` |
+| Setup instructions | ✅ (partial) | 5-step setup with code blocks |
+| Tech stack | ✅ | Listed in "Stack" section |
+| Route table | ✅ | All main routes listed with descriptions |
+| API table | ✅ | Full endpoint table with methods and descriptions |
+| Project structure | ✅ | Tree structure of `src/` directory |
+| Useful commands | ✅ | npm run dev/build/seed, Prisma commands |
+| Documentation reference | ✅ | Links to `referencias/` and `documentacion/` |
+| Architecture context | ✅ | Table showing all 4 apps and their owners |
 
 ---
 
-## Missing: Deploy Link
+## ⚠️ Issues Found
 
-This is an automatic point deduction. The README must have the Vercel URL.
-
-```markdown
-## 🌐 App en producción
-
-https://proyecto-buyer-bicimarket.vercel.app  ← (reemplazar con URL real)
-```
-
----
-
-## Missing: User Credentials
-
-The evaluator needs to log in to test the app. Without credentials they cannot evaluate any auth-dependent features.
-
-Required:
-1. A **buyer user** — email + password that works on the deployed Clerk instance
-2. An **admin user** — email + password of a Clerk user with `publicMetadata.admin = true`
-
-Example section to add:
-
-```markdown
-## 👤 Acceso de prueba
-
-### Usuario comprador
-- **Email**: comprador@test.bicimarket.com
-- **Contraseña**: BiciMarket2026!
-
-### Usuario administrador
-- **Email**: admin@test.bicimarket.com  
-- **Contraseña**: BiciAdmin2026!
-- El usuario admin tiene `publicMetadata.admin = true` configurado en Clerk.
-- Panel de admin: `/admin`
-
-> Para crear un admin nuevo: registrarse normalmente → ir al Clerk Dashboard → buscar el usuario → editar `publicMetadata` → agregar `{ "admin": true }`.
-```
-
----
-
-## Issues with Current README
-
-### 1. Instruction "cp .env .env.local" is misleading
-```bash
-cp .env .env.local  # "Copiar los valores del grupo y pegarlos en .env.local"
-```
-This instruction says to copy `.env` which is gitignored — a new developer cloning the repo won't have this file. Should say to copy `.env.example` instead.
-
-### 2. Next.js version is wrong
-The README says `Next.js 16 (App Router)` in the tech stack table. This is correct (package.json has `"next": "16.2.3"`) but unusual — most tutorials reference Next.js 14/15. Not a problem, just notable.
-
-### 3. Admin not mentioned
-The README has a routes table that includes `/dashboard`, `/shop`, `/cart` etc. but has no mention of the admin panel at `/admin`. The admin panel is a graded feature.
-
-### 4. Seed instructions missing
-No mention of how to populate the database with test data. After `npm run build`, the app will be empty.
-
----
-
-## Recommended README Structure
-
-Replace the current README with a version that leads with the critical information:
-
-```markdown
-# BiciMarket — Buyer App
-
-Aplicación del **comprador** del marketplace BiciMarket. Permite navegar el catálogo, 
-gestionar el carrito, hacer checkout y ver el historial de pedidos.
-
-## 🌐 Demo
-
-**URL**: https://proyecto-buyer-bicimarket.vercel.app
-
-## 👤 Acceso de prueba
-
-| Rol | Email | Contraseña |
-|-----|-------|-----------|
-| Comprador | comprador@test.bicimarket.com | BiciMarket2026! |
-| Admin | admin@test.bicimarket.com | BiciAdmin2026! |
-
-Panel de administración: `/admin`
-
-## Stack
-
-Next.js 16 · PostgreSQL · Prisma · Clerk · Tailwind CSS · shadcn/ui
-
-## Setup local
+### Issue 1: Setup Step 2 References Wrong File
 
 ```bash
-cp .env.example .env.local   # Completar con las variables del grupo
-npm install
-npx prisma db push
-npx prisma db seed
-npm run dev
+# Current (WRONG):
+cp .env .env.local   # Completar con los valores del grupo
+
+# Should be:
+cp .env.example .env.local   # Completar con los valores del grupo
 ```
 
-## Arquitectura
+**Impact:** If someone follows step 2 literally, they copy the real `.env` (which contains actual credentials) rather than the template. In a clean clone where `.env` doesn't exist (because it's gitignored), this command fails silently.
 
-Esta app es una de cuatro apps independientes (Buyer, Seller, Shipping, Payments).
-Ver `documentacion/` para la arquitectura completa.
-```
-
-Keep the rest of the current README content below this section — it's useful but shouldn't be the first thing an evaluator sees.
+**Fix:** Change step 2 to `cp .env.example .env.local`.
 
 ---
 
-## Action Required
+### Issue 2: No Mention of Admin Creation Process
 
-**Before submission** (estimated 20 minutes):
-1. Deploy the app
-2. Create test users in Clerk (buyer + admin)  
-3. Add deploy URL to README
-4. Add test credentials to README
-5. Add admin route mention to README routes table
+The README lists `admin@test.com` but does not explain how this user was made admin. Someone setting up the project fresh will not know they need to:
+1. Register via Clerk sign-up
+2. Go to Clerk Dashboard
+3. Find the user
+4. Add `publicMetadata: { "admin": true }`
+
+There is a note: *"Para crear un admin nuevo: registrarse normalmente → ir al Clerk Dashboard → buscar el usuario → editar `publicMetadata` → agregar `{ "admin": true }`."* — this IS present. ✅
+
+---
+
+### Issue 3: Setup Does Not Mention All Required Env Vars
+
+Setup step 2 says "Completar con los valores del grupo" but doesn't specify which values are needed from which team members. A new developer would not know they need service tokens from 3 other people.
+
+**Fix:** Add a note listing which env vars need cross-team coordination.
+
+---
+
+### Issue 4: No Mention of `NEXT_PUBLIC_APP_URL`
+
+This variable is not in `.env.example` but will be needed once the payment function is fixed (FIX-01). Pre-emptively add it.
+
+---
+
+### Issue 5: No Indication of What Fails Without Full Integration
+
+The README does not mention that checkout is mocked or that most inter-app features require configuration. A professor deploying the app cold would not understand why checkout doesn't work.
+
+**Fix:** Add a "Known Limitations / Mock Behavior" section explaining which features are mocked.
+
+---
+
+### Issue 6: Stack Says "Next.js 16" — Non-Standard Version
+
+`package.json` has `"next": "16.2.3"`. This is not a standard public release version that a professor would recognize. Worth noting in the README that this is the project's custom/academic version per AGENTS.md.
+
+---
+
+## Recommended README Improvements
+
+### Add: "Known Limitations" Section
+
+```markdown
+## Known Limitations (Demo Mode)
+
+When `SELLER_APP_URL` is configured but `BUYER_TO_SELLER_SERVICE_TOKEN` is missing, the catalog falls back to 12 mock products.
+
+When `PAYMENTS_APP_URL` is not configured or inter-app tokens are missing, checkout uses a mock payment session and does not connect to Mercado Pago.
+
+See `documentacion/` for full integration requirements.
+```
+
+### Fix Setup Step 2
+
+```markdown
+# 2. Configurar variables de entorno
+cp .env.example .env.local
+# Completar con los valores del grupo (coordinarse con los otros repos para los service tokens)
+```
+
+### Add: Required Team Coordination
+
+```markdown
+## Setup Completo (Integración Multi-App)
+
+Para habilitar la integración completa:
+- `PAYMENTS_TO_BUYER_SERVICE_TOKEN` — debe coincidir con el valor en Payments App (Rocco Paoloni)
+- `SHIPPING_TO_BUYER_SERVICE_TOKEN` — debe coincidir con el valor en Shipping App (Enrique Seitz)
+- `SELLER_TO_BUYER_SERVICE_TOKEN` — debe coincidir con el valor en Seller App (Pierino Spina)
+- `BUYER_TO_PAYMENTS_SERVICE_TOKEN` — compartir con Payments App
+- `BUYER_TO_SHIPPING_SERVICE_TOKEN` — compartir con Shipping App
+```
+
+---
+
+## Overall README Grade
+
+**Grade: B+**
+
+The README is well-structured and covers most required elements. The deploy link, credentials, setup steps, route table, and API table are all present and clear. The main gaps are: wrong source file in setup step 2, no mention of integration requirements, and no explicit mock limitations disclosure. These are quick fixes.

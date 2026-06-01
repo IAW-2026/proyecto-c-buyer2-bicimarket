@@ -1,506 +1,439 @@
 # 02 — Etapa 2 Compliance Audit
-> Audit generated: 2026-05-31 | Delivery: 2026-06-01 | Defense: 2026-06-04 / 2026-06-08
+
+> Each requirement is evaluated against the actual implementation. Evidence references concrete files and line numbers.
 
 ---
 
-## R1 — Next.js reusable pages and components
+## REQ-01: Next.js App Router with Reusable Pages and Components
 
-### Requirement
-Páginas y componentes reutilizables en Next.js.
-
-### Status
-**PASS**
+### Status: PASS
 
 ### Evidence
-- App Router with full page tree: `/`, `/shop`, `/shop/[productId]`, `/cart`, `/checkout`, `/orders`, `/orders/[orderId]`, `/dashboard`, `/profile`, `/favorites`, `/admin/*`, `/sign-in`, `/sign-up`, `/api-docs`
-- Shared components: `EmptyState`, `PriceDisplay`, `StatusBadge`, `ProductImage`
-- Domain components: `ProductCard`, `CartItemRow`, `OrderCard`, `FavoriteCard`, `AddressSelector`, `SellerGroupPreview`
-- Admin components: `OrdersTable`, `BuyersTable`, `CartsTable`, `StatsOverview`
-- UI library: full shadcn/ui component set
+- App Router structure in `src/app/` with route groups: `(auth)/`, `admin/`, `shop/`, `api/`
+- Reusable components in `src/components/` organized by domain: `admin/`, `buyer/`, `cart/`, `checkout/`, `dashboard/`, `favorites/`, `orders/`, `profile/`, `shared/`, `shop/`, `ui/`
+- 30+ shadcn/ui base components in `src/components/ui/`
+- Shared components: `pagination-controls.tsx`, `status-badge.tsx`, `empty-state.tsx`, `price-display.tsx`, `product-image.tsx`
 
 ### Issues
-- `src/components/buyer/` and `src/components/shop/` show some component duplication (`CartItemCard` vs `CartItemRow`).
-- Admin layout (`src/app/admin/layout.tsx`) does **not** include `AdminSidebar` or `AdminHeader` components even though they exist in `src/components/admin/`. Admin pages have no persistent navigation.
+- Shop page (`src/app/shop/page.tsx`) is marked `"use client"` at the top level; no server-side rendering or SEO optimization for the catalog
+- Several pages lack `loading.tsx` / `error.tsx` per-segment files (only one global `error.tsx`)
 
 ### Risk During Evaluation
-Professor may navigate to `/admin` and find a bare page layout with no sidebar navigation.
+Low. Component organization is clear and reuse is evident.
 
 ### Recommendation
-Wire `AdminSidebar` and `AdminHeader` into `src/app/admin/layout.tsx`.
+Add `loading.tsx` to key routes (`/shop`, `/orders`, `/checkout`) for bonus credit.
 
 ---
 
-## R2 — Own REST API
+## REQ-02: Own REST API
 
-### Requirement
-API propia — cada app expone sus propios endpoints REST.
-
-### Status
-**PASS** (with reservations)
+### Status: PASS
 
 ### Evidence
-Full REST API implemented:
-- `/api/v1/buyer/profile` — GET, PATCH
-- `/api/v1/buyer/addresses` — GET, POST
-- `/api/v1/buyer/addresses/[id]` — PATCH, DELETE
-- `/api/v1/buyer/cart` — GET, POST
-- `/api/v1/buyer/cart/[id]` — PATCH, DELETE
-- `/api/v1/buyer/favorites` — GET, POST
-- `/api/v1/buyer/favorites/[id]` — DELETE
-- `/api/v1/buyer/orders` — GET
-- `/api/v1/buyer/orders/[id]` — GET
-- `/api/v1/buyer/orders/[id]/cancel` — POST
-- `/api/v1/buyer/checkout` — POST
-- `/api/v1/orders/[id]` — PATCH (from Payments)
-- `/api/v1/orders/[id]/seller-groups/[g]/shipping` — PATCH (from Shipping)
-- `/api/v1/orders/[id]/seller-groups/[g]/status` — PATCH (from Seller)
-- Admin endpoints under `/api/admin/*`
+- Full CRUD API under `/api/v1/buyer/profile`, `/api/v1/buyer/addresses`, `/api/v1/buyer/cart`, `/api/v1/buyer/favorites`, `/api/v1/buyer/orders`, `/api/v1/buyer/checkout`
+- Inter-app endpoints: `/api/v1/orders/[orderId]/route.ts` (← Payments), `/api/v1/orders/[orderId]/seller-groups/[groupId]/shipping/route.ts` (← Shipping), `/api/v1/orders/[orderId]/seller-groups/[groupId]/status/route.ts` (← Seller)
+- Admin APIs: `/api/admin/buyers`, `/api/admin/carts`, `/api/admin/orders`, `/api/admin/stats`
+- Health check: `/api/health`
+- API docs: `/api/docs` (OpenAPI spec), `/api-docs` (Swagger UI page)
 
 ### Issues
-- **`GET /api/v1/buyer/orders` has no pagination** (`src/app/api/v1/buyer/orders/route.ts`). Returns all orders with `findMany` — no `page`, `limit`, `has_more` in the response. Violates the standard pagination contract from `documentacion/02-responsabilidades.md §4`.
-- **`GET /api/admin/orders` has no pagination** (`src/app/api/admin/orders/route.ts`). Same issue.
-- **`GET /api/v1/buyer/addresses` has no pagination** — returns raw array, not the documented `{ data, pagination }` envelope.
-- **`GET /api/v1/buyer/favorites` has no pagination**.
-- **Error format inconsistency** — Some routes return `{ error: "string" }` (e.g., checkout route), others return the documented `{ error: { code, message, details } }` structure.
-- **README lists routes without `/v1` prefix** (e.g., `/api/buyer/profile` instead of `/api/v1/buyer/profile`) — README is wrong, implementation is correct, but this could confuse evaluators.
+- `POST /api/v1/buyer/cart` requires the client to send all product data (`sellerProfileId`, `productNameSnapshot`, `unitPriceCents`, `weightGramsSnapshot`) instead of just `{ product_id, quantity }`. This bypasses the Seller App availability check and allows **price manipulation** from the browser. This is a **functional deviation from the specification** (`documentacion/03-apis.md §B3`).
+- `/api/products` and `/api/products/[productId]` exist at the non-versioned path, violating the `/api/v1/` convention.
+- Admin error format in `admin-auth.ts:13` returns `{ error: "Unauthorized" }` instead of the standard `{ error: { code, message, details } }`.
 
 ### Risk During Evaluation
-Evaluator calls `GET /api/v1/buyer/orders` and finds no pagination envelope — direct spec violation.
+Medium. A professor examining the cart POST will see that client controls the price snapshot, which is a clear security/design flaw.
 
 ### Recommendation
-Add pagination to all list endpoints. Standardize error format across all routes.
+Move product data resolution to the server: `POST /api/v1/buyer/cart` should accept only `{ product_id, quantity }` and call `seller-api.ts::getProductAvailability` internally.
 
 ---
 
-## R3 — PostgreSQL ownership
+## REQ-03: PostgreSQL Ownership
 
-### Requirement
-Base de datos PostgreSQL propia — cada app es dueña de sus datos.
-
-### Status
-**PASS**
+### Status: PASS
 
 ### Evidence
-- `prisma/schema.prisma` defines all tables: `BuyerProfile`, `Address`, `Cart`, `CartItem`, `FavoriteItem`, `Order`, `OrderSellerGroup`, `OrderItem`, `OrderStatusHistory`
-- Supabase PostgreSQL configured via `DATABASE_URL` and `DIRECT_URL` env vars
-- All cross-app IDs stored as opaque strings (no FK to external tables) — correct architecture
-- `prisma/migrations/` has two migrations: `20260413214353_init` and `20260413215035_add_product`
+- `prisma/schema.prisma` defines all 8 tables: `BuyerProfile`, `Address`, `Cart`, `CartItem`, `FavoriteItem`, `Order`, `OrderSellerGroup`, `OrderItem`, `OrderStatusHistory`
+- Supabase PostgreSQL configured via `DATABASE_URL` and `DIRECT_URL` in `.env`
+- Two migrations in `prisma/migrations/`
 
 ### Issues
-- **IDs do not use resource prefixes**. The schema uses `@default(cuid())` without the documented `ord_`, `byp_`, `adr_` prefixes. The docs explicitly state IDs should be `ord_01H…`, `byp_01H…` etc. This is a visible deviation when the evaluator inspects database records or API responses.
-- **Missing `order_status_history` table scope** — `OrderStatusHistory` doesn't have an index on `order_id` which would be slow for large datasets, but acceptable for academic scale.
-- **`shippingCostCents` is always 0 per seller group** in the checkout route (`route.ts:118: shippingCostCents: 0`). The shipping total is correctly applied to `Order.shippingTotalCents` but the per-group breakdown is wrong.
+- **IDs use bare `cuid()` without resource prefixes.** Documentation (`04-modelo-de-datos.md §0`) specifies IDs like `ord_…`, `byp_…`, etc. The schema uses `@default(cuid())` with no prefix. This is a deviation from the spec but low academic impact.
+- `ShippingStatus` enum has `PENDING` as a valid first value in the schema but `PENDING` is not in the shipping states documented in `03-apis.md §0.4` or `06-estados.md §1.4`. The docs list the first valid state as `CREATED`, `READY_FOR_PICKUP`, etc. There is no `PENDING` shipping status in the spec. However the `ShippingStatus?` field on `OrderSellerGroup` is nullable, so this may not cause problems.
+- Actually `ShippingStatus` in the Prisma schema does NOT include `PENDING` — it starts with `CREATED`. The field `shippingStatus` on `OrderSellerGroup` is nullable (`ShippingStatus?`), which handles the initial unset state correctly.
 
 ### Risk During Evaluation
-Low for core grading. The ID prefix deviation is cosmetic but visible. The `shippingCostCents: 0` per group is a data integrity issue that could surface during order detail review.
+Low. The DB is well-structured and matches the documented model closely.
 
 ### Recommendation
-Either generate IDs with prefixes in application code or note the deviation explicitly.
+Add resource ID prefixes in application code (via a helper that generates `"ord_" + cuid()`) to match spec.
 
 ---
 
-## R4 — Authentication
+## REQ-04: Authentication
 
-### Requirement
-Autenticación — login/logout para usuarios administradores (obligatorio). Login para usuarios finales según corresponda al dominio de la app.
-
-### Status
-**PARTIAL — CRITICAL ISSUE**
+### Status: PASS (with gaps)
 
 ### Evidence
-- Clerk integrated via `ClerkProvider` in root layout
-- `(auth)/layout.tsx` protects all buyer-facing routes
-- `admin/layout.tsx` calls `requireAdmin()` which checks `publicMetadata.admin`
-- API routes use `auth()` from `@clerk/nextjs/server`
+- Clerk `@clerk/nextjs` v7 installed
+- Auth check in every API route via `auth()` from Clerk
+- Admin protection via `requireAdmin()` / `requireAdminApi()` checking `publicMetadata.admin`
+- Auth layout at `(auth)/layout.tsx` redirects unauthenticated users to `/sign-in`
+- Admin layout at `admin/layout.tsx` calls `requireAdmin()`
 - Sign-in/sign-up pages at `/sign-in` and `/sign-up`
 
 ### Issues
-- **NO `middleware.ts` FILE EXISTS**. The entire project has no Clerk middleware. In `@clerk/nextjs` v7.x, the middleware is required for:
-  1. Setting up auth state for `auth()` and `currentUser()` in server components/API routes
-  2. Protecting routes at the edge
-  3. Enabling the Clerk JS browser client to pick up session cookies
-  
-  Without middleware, `auth()` calls in API routes may return null `userId` even when the user IS logged in, because the session token is not being propagated properly. This is a **production-breaking defect**.
-
-- Auth checks are done ad-hoc in each layout/route rather than centrally via middleware, which is fragile and may result in unprotected routes.
+- **No `middleware.ts` file.** Clerk's Next.js v7 SDK requires a `middleware.ts` at the root to protect routes at the edge. Without it, API routes are only protected by in-handler checks, and unauthenticated requests to non-API routes can bypass the layout redirect in some edge cases. This is a configuration gap.
+- **No `buyer` role check.** Buyer API endpoints only verify `userId` (any authenticated Clerk user), not `publicMetadata.role = "buyer"`. A seller or logistics operator can access buyer endpoints.
+- Profile `PATCH` doesn't support updating `default_shipping_address_id` — the spec (`03-apis.md §B1`) lists this as a patchable field. The implementation schema only allows `fullName` and `phone`.
 
 ### Risk During Evaluation
-**HIGH**. If the deployed app has auth working only because of local dev quirks, the evaluator will find that login/logout functionality is broken or unreliable in production (Vercel). The absence of `middleware.ts` is a textbook Clerk setup error that professors familiar with the framework will catch immediately.
+Medium. The `middleware.ts` absence is something professors look for when auditing Next.js + Clerk setups. Role enforcement gap could be raised.
 
 ### Recommendation
-**MUST FIX BEFORE SUBMISSION**: Create `middleware.ts` in the project root with:
-```typescript
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-
-const isPublicRoute = createRouteMatcher([
-  "/", "/shop(.*)", "/sign-in(.*)", "/sign-up(.*)",
-  "/api/v1/orders(.*)",  // inter-service routes
-  "/api/products(.*)",
-  "/api/health(.*)",
-]);
-
-export default clerkMiddleware(async (auth, req) => {
-  if (!isPublicRoute(req)) {
-    await auth.protect();
-  }
-});
-
-export const config = {
-  matcher: ["/((?!.*\\..*|_next).*)", "/", "/(api|trpc)(.*)"],
-};
-```
+1. Add `src/middleware.ts` with `clerkMiddleware()` and a route matcher protecting `/(auth)/**` and `/admin/**`.
+2. Optionally add buyer role check: verify `publicMetadata.role === "buyer"` in `getOrCreateBuyerProfile`.
+3. Add `default_shipping_address_id` to the profile PATCH schema.
 
 ---
 
-## R5 — Admin Panel
+## REQ-05: Admin Panel
 
-### Requirement
-Panel de administración — el usuario administrador debe poder gestionar los datos principales de la app y visualizar al menos un listado o reporte relevante.
-
-### Status
-**PARTIAL**
+### Status: PASS
 
 ### Evidence
-- Admin panel at `/admin` with stats overview
-- `/admin/orders` — order list with status filter
-- `/admin/orders/[id]` — order detail with status change capability
-- `/admin/buyers` — buyer list
-- `/admin/carts` — cart monitoring
-- Admin APIs: `/api/admin/stats`, `/api/admin/orders`, `/api/admin/buyers`, `/api/admin/carts`
-- Auth protected with `requireAdmin()` checking `publicMetadata.admin`
+- `/admin` — dashboard with `StatsOverview` and recent orders table
+- `/admin/buyers` — buyer list with `BuyersTable`
+- `/admin/carts` — active cart viewer with `CartsTable`
+- `/admin/orders` — full order list with `OrdersTable`
+- `/admin/orders/[orderId]` — order detail with `OrderDetailView`
+- Stats API at `/api/admin/stats` returns: totalBuyers, ordersByStatus, cartsByStatus, revenueCents, ordersLast24h
+- Protected by `publicMetadata.admin = true`
 
 ### Issues
-- **Admin layout has no navigation**. `src/app/admin/layout.tsx` renders only `<main className="flex-1 overflow-y-auto">{children}</main>`. The `AdminSidebar` and `AdminHeader` components exist but are not wired in. Navigating to `/admin/buyers` from `/admin/orders` requires manually editing the URL.
-- **Admin order list has no pagination** — returns all orders via `findMany` without `skip`/`take`.
-- **Admin cannot create/delete buyers** — only viewing. This is acceptable per domain.
-- **Admin status change in `/api/admin/orders/[orderId]` accepts all status values** with no transition validation — an admin can set any order from any state to any other state (including nonsensical transitions like `COMPLETED → PENDING_PAYMENT`).
+- Admin panel is read-only for orders. There is no admin action to change order status manually (no "mark as paid" or "force cancel" button visible in the UI).
+- Seller group status update endpoint exists but no admin UI trigger.
+- No export functionality (CSV/Excel) for data listings.
 
 ### Risk During Evaluation
-**MEDIUM**. The professor will navigate to `/admin` and immediately notice there's no menu to go to buyers, carts etc. If they don't know the exact URLs, they may think those pages don't exist.
+Low. Admin panel is present and functional for viewing data.
 
 ### Recommendation
-Add sidebar navigation to admin layout. At minimum, include links to all admin sub-pages.
+Add at least one admin action (e.g., manually cancel an order or update a seller group status) to show interactive admin capability.
 
 ---
 
-## R6 — Search and Pagination
+## REQ-06: Reports / Listings
 
-### Requirement
-Búsqueda y paginación — donde aplique, implementar búsqueda y paginación con parámetros en la URL.
-
-### Status
-**PARTIAL**
+### Status: PASS
 
 ### Evidence
-- **Search**: `useShopFilters` hook (`src/hooks/use-shop-filters.ts`) implements URL-based filtering for the shop with `q`, `category`, `bikeType`, `minPrice`, `maxPrice`, `sellers` parameters. These are reflected in the URL and survive page refresh.
-- **Client-side filtering**: The shop page filters client-side on all loaded products.
+- Orders listing at `/orders` with paginated API (`GET /api/v1/buyer/orders?page=X&limit=Y`)
+- Admin stats dashboard with aggregate metrics
+- Order detail with full seller group breakdown
+- Buyer list in admin with profile data
+- Cart list in admin showing item counts and values
 
 ### Issues
-- **No server-side pagination** anywhere. The shop page loads ALL products in one request. For 12 mock products this is fine; for a real catalog it would break.
-- **Orders page has no pagination** — displays all orders at once.
-- **Admin orders/buyers/carts have no pagination in UI or API**.
-- **Pagination response envelope missing** from all list endpoints — the documented `{ data, pagination: { total, page, limit, has_more } }` structure is absent.
-- **`page` and `limit` URL params not implemented** — only filter params are in the URL, no `?page=2&limit=20`.
+- Orders listing UI does not appear to use the `PaginationControls` component — the orders page loads all user orders without a visible pager in the frontend. The API supports pagination but the UI may not wire it up.
 
 ### Risk During Evaluation
-**HIGH**. The requirement explicitly says "paginación con parámetros en la URL". A professor looking at the shop URL after filtering will see filter params but no pagination params. The API responses won't show the documented pagination envelope.
+Low if orders list is short in demo. Medium if professor clicks through many orders.
 
 ### Recommendation
-1. Add server-side pagination to `/api/v1/buyer/orders` and `/api/admin/orders`.
-2. Add `page`/`limit` URL params to the orders page.
-3. Wrap all list API responses in `{ data, pagination }` envelope.
+Verify that the orders page (`src/app/(auth)/orders/page.tsx`) connects to the paginated API and renders `PaginationControls`.
 
 ---
 
-## R7 — Error Handling and 404 Pages
+## REQ-07: Search
 
-### Requirement
-Manejo de errores — errores generales y páginas 404.
-
-### Status
-**PASS**
+### Status: PARTIAL
 
 ### Evidence
-- `src/app/not-found.tsx` — custom 404 page with "Volver al inicio" link
-- `src/app/error.tsx` — global error boundary with "Intentar de nuevo" button
-- API routes return appropriate HTTP status codes (400, 401, 403, 404, 409)
-- Some API routes use the documented error format `{ error: { code, message } }`
+- `useShopFilters` hook in `src/hooks/use-shop-filters.ts` provides client-side filtering
+- `FilterPanel` component supports category and search query filtering
+- `filter-panel.tsx` includes a price range slider
 
 ### Issues
-- **Inconsistent error format** — some routes return `{ error: "string" }` (checkout route line 28: `{ error: parsed.error.issues... }`), others return the documented `{ error: { code, message } }` format. This inconsistency means frontend error handling can't rely on a consistent structure.
-- **Error messages mix Spanish and English** — some validation errors come from Zod in English, some manual messages are in Spanish.
-- **`not-found.tsx` has a typo**: "La pagina que buscas no existe." — missing accent on "página".
-- **`error.tsx` has a typo**: "Algo salio mal" and "Ocurrio un error inesperado." — missing accents.
+- **Search is entirely client-side.** All products are loaded in one API call, then filtered in the browser. For the mock catalog (12 products) this works. For a real catalog with hundreds of products this would be unusable.
+- No URL parameters for search/filter state — filters reset on page navigation.
+- The API `/api/products` does not accept `?q=`, `?category=`, `?min_price=`, `?max_price=` parameters — it returns all products always.
+- The Seller App contract documents server-side filtering at `GET /api/v1/products?q=...&category=...`. The Buyer proxy does not forward these params.
 
 ### Risk During Evaluation
-LOW — 404 and error pages exist. The inconsistency is cosmetic for grading purposes.
+Medium. Professor will likely ask "how does search work?" and the answer "client-side filtering of the full list" is architecturally weak.
 
 ### Recommendation
-Fix typos. Standardize error format to `{ error: { code, message } }` across all routes.
+Pass filter params from the UI through the proxy to Seller App: `GET /api/products?q=X&category=Y` → `getSellerProducts({ q, category })` → `GET /api/v1/products?q=X&category=Y` on Seller App.
 
 ---
 
-## R8 — Server-side Form Validation
+## REQ-08: Pagination
 
-### Requirement
-Validación de formularios del lado del servidor.
-
-### Status
-**PASS**
+### Status: PARTIAL
 
 ### Evidence
-- All API routes use Zod for request validation
-- Checkout route: `checkoutSchema` validates `shippingAddressId`, `notes`, `returnUrl`
-- Shipping endpoint: validates all incoming fields with enum constraints
-- Status update endpoints validate enum transitions
-- Profile, address, cart, favorites all have validation schemas
+- `PaginationControls` component built and functional at `src/components/shared/pagination-controls.tsx`
+- API endpoints for orders and addresses support `?page=&limit=` query parameters
+- Admin orders table uses pagination API
 
 ### Issues
-- **Checkout route validates `returnUrl` with `z.string().url()`** but the URL is only used internally to return to the orders page — not passed to any payment service. Validating it serves no functional purpose in the current mock payment implementation.
-- **No idempotency key validation** on checkout endpoint — the spec requires `Idempotency-Key` header for POST operations that create resources. The checkout route ignores this header entirely.
+- **Shop page has no pagination.** All products are loaded at once. The Seller App supports paginated catalog (`?page=&limit=`) but the Buyer proxy ignores these.
+- It is unclear whether the buyer orders UI connects the `PaginationControls` component to the paginated API. The `use-order-tabs.ts` hook needs inspection.
+- Admin tables may implement pagination client-side.
 
 ### Risk During Evaluation
-LOW. Server-side validation is clearly present.
-
----
-
-## R9 — Accessibility
-
-### Requirement
-Accesibilidad — aplicar buenas prácticas básicas.
-
-### Status
-**PARTIAL**
-
-### Evidence
-- `lang="es"` on `<html>` element
-- Product images have `alt` attributes
-- Form labels present in profile/address forms
-- Button components use semantic `<button>` elements
-- Heading hierarchy generally maintained
-
-### Issues
-- **`@ts-nocheck` in 26+ UI components** — Most shadcn/ui components in `src/components/ui/` have `// @ts-nocheck` at the top. This suppresses TypeScript errors including potential accessibility prop type errors.
-- **No `aria-label` on icon-only buttons** — Navigation items with only icons (e.g., cart icon in header) may lack accessible labels.
-- **No visible focus rings tested** — Not confirmed whether keyboard navigation is functional.
-- **Color contrast not verified** — The muted-foreground color scheme may fail WCAG AA.
-
-### Risk During Evaluation
-MEDIUM. A basic visual check won't catch most accessibility issues, but a professor who checks keyboard navigation or uses a screen reader may flag icon buttons without labels.
+Medium. A demo with only 12 mock products hides the issue. If real Seller App is connected and has many products, the page would load everything.
 
 ### Recommendation
-Add `aria-label` to icon-only buttons. Verify focus ring visibility.
+Add server-side pagination to the shop proxy: accept `?page=&limit=` in `/api/products` and pass to Seller App.
 
 ---
 
-## R10 — External API Consumption
+## REQ-09: URL Parameter Handling
 
-### Requirement
-Consumo de al menos una API externa — integrar un servicio externo que aporte valor al dominio de la app. Debe hacerse un request real y procesarse la respuesta (no embeds). Las APIs de las otras webapps del mismo proyecto cuentan como externas.
+### Status: PASS
 
-### Status
-**PARTIAL — CRITICAL CONCERN**
+### Evidence
+- Dynamic route segments: `[orderId]`, `[groupId]`, `[addressId]`, `[favoriteId]`, `[itemId]`, `[productId]`
+- Query params parsed in orders listing (`page`, `limit`) and addresses listing
+- Clerk sign-in uses `[[...sign-in]]` catch-all pattern
+
+### Issues
+- No URL-reflected filter state in `/shop` — selected category/search is component state only, not reflected in the URL. Deep-linking to a filtered state is not possible.
+
+### Risk During Evaluation
+Low. Dynamic segments work correctly.
+
+### Recommendation
+Sync filter state to URL via `useSearchParams` / `router.push` in `useShopFilters`.
+
+---
+
+## REQ-10: Error Handling
+
+### Status: PASS (with inconsistencies)
+
+### Evidence
+- Global `error.tsx` at `src/app/error.tsx`
+- `not-found.tsx` at `src/app/not-found.tsx`
+- All API routes return structured errors: `{ error: { code, message, details } }`
+- 404, 401, 409 (INVALID_TRANSITION) all handled with correct HTTP codes
+- Zod validation on all request bodies
+
+### Issues
+- `admin-auth.ts:13` returns `{ error: "Unauthorized" }` (bare string) instead of `{ error: { code, message, details } }` — inconsistent with the rest of the API.
+- `service-auth.ts` returns 500 when the service token env var is not configured. A 500 is misleading — it should be a 503 (Service Unavailable) or the endpoint should gracefully indicate a config problem. More importantly, this means **all inter-app endpoints will 500 if the env vars are not set**, which is the current state for most tokens (see §deployment).
+- No error boundary for individual page sections (only at root level).
+
+### Risk During Evaluation
+Low for basic error handling. Medium if professor tests an unauthenticated admin API call and sees the inconsistent format.
+
+### Recommendation
+Fix `admin-auth.ts` to use the standard error envelope. Handle missing service token with a clearer response.
+
+---
+
+## REQ-11: 404 Pages
+
+### Status: PASS
+
+### Evidence
+- `src/app/not-found.tsx` renders a styled 404 page with a "back to home" link.
+
+### Issues
+- Minor: "La pagina" should be "La página" (missing accent). Small but visible.
+
+### Risk During Evaluation
+Low.
+
+### Recommendation
+Fix the typo: `"La pagina que buscas"` → `"La página que buscas"`.
+
+---
+
+## REQ-12: Server-Side Validation
+
+### Status: PASS
+
+### Evidence
+- Zod schemas used in every POST/PATCH route handler: `checkoutSchema`, `cartItemSchema`, `addressSchema`, `updateProfileSchema`, `patchSchema`
+- All schemas validated with `safeParse` before any DB operations
+- Type-safe Prisma calls enforce DB-level constraints
+
+### Issues
+- The `cartItemSchema` (in cart POST) requires `unitPriceCents` and `weightGramsSnapshot` from the client. While these are validated as non-negative integers, the server does not verify these values against the real Seller App. A client can send `unitPriceCents: 1` for any product.
+
+### Risk During Evaluation
+Medium. A professor who examines the cart POST carefully will notice the price is trust-based from the client.
+
+### Recommendation
+Remove client-supplied price/weight from `cartItemSchema` and resolve from Seller App server-side.
+
+---
+
+## REQ-13: Accessibility
+
+### Status: PARTIAL
+
+### Evidence
+- shadcn/ui components have ARIA attributes built in (Radix UI primitives)
+- `PaginationControls` uses `aria-label` on prev/next buttons and `aria-current="page"` on current page
+- Semantic HTML elements (`<main>`, `<aside>`, `<h1>`, `<h2>`)
+
+### Issues
+- Shop filter panel and product grid lack explicit `role` attributes
+- No `aria-live` regions for dynamic content updates (cart additions, filter results)
+- No skip-to-content link
+- Color contrast not audited
+- No visible focus indicators confirmed (depends on shadcn theme)
+- No keyboard navigation testing documented
+
+### Risk During Evaluation
+Low (rarely graded in detail unless explicitly in rubric).
+
+### Recommendation
+Add `role="status"` to the product count text in ShopContent. Ensure all interactive elements are keyboard accessible.
+
+---
+
+## REQ-14: External API Consumption
+
+### Status: PARTIAL
 
 ### Evidence
 - `src/lib/seller-api.ts` — calls Seller App `GET /api/v1/products` and `GET /api/v1/products/{id}/availability`
-- `src/lib/shipping-api.ts` — calls Shipping App `POST /api/v1/shipping-quotes`
-- `src/lib/payments-api.ts` — calls Payments App `POST /api/v1/payments`
-- All three files fall back to mock data when env vars `SELLER_APP_URL`, `SHIPPING_APP_URL`, `PAYMENTS_APP_URL` are not set
+- `src/lib/shipping-api.ts` — calls Shipping App `POST /api/v1/shipping-quotes` and `GET /api/v1/shipments`
+- `src/lib/payments-api.ts` — calls Payments App `POST /api/v1/payments` and `GET /api/v1/receipts/{id}`
+- Service client factory in `src/lib/service-client.ts`
 
 ### Issues
-- **In the current state, all external calls are mocked**. The env vars `SELLER_APP_URL`, `SHIPPING_APP_URL`, `PAYMENTS_APP_URL` are NOT present in `.env` (only `DATABASE_URL`, `DIRECT_URL`, and Clerk keys are present). This means the app never makes a real external call.
-- **The mock fallback is acceptable for Etapa 2 isolation** as per the assignment: "Las llamadas a APIs de otras webapps deben mockearse o simularse durante esta etapa." However, the actual HTTP client code for real calls IS implemented, which satisfies the spirit of the requirement.
-- **For the defense**, the professor will likely ask "can you make a real call?" — the answer is yes IF the partner app URLs are configured, but right now they're not.
+- **CRITICAL**: The checkout route (`src/app/api/v1/buyer/checkout/route.ts:168`) calls `createPaymentSession` from `buyer-service.ts`, NOT `createPayment` from `payments-api.ts`. The `buyer-service.ts::createPaymentSession` is **hardcoded to return a mock** `paymentUrl: "https://example-payment.local/checkout?order=${orderId}"`. This means even when `PAYMENTS_APP_URL` is correctly configured, the payment is never actually sent to the real Payments App. Checkout is broken in production.
+- `payments-api.ts::createPayment` is written correctly but is never called by the checkout flow.
+- No retry logic (3 attempts with 1s/3s/9s backoff) on any external API call. If Seller or Shipping App is down, the error propagates immediately.
+- No `X-Request-Id` header propagated in `service-client.ts`.
 
 ### Risk During Evaluation
-MEDIUM. The assignment says mocking is acceptable for Etapa 2. However, the evaluator may want to see at least one live call. If the Seller App (Pierino) has a deployed instance, connecting to it would demonstrate real external API consumption.
+**HIGH**. If the professor clicks "checkout" with Payments App connected, nothing will happen (redirect to `https://example-payment.local/...` which is not a real URL). This will fail the end-to-end checkout demonstration.
 
 ### Recommendation
-Configure `SELLER_APP_URL` in `.env.local` and Vercel to point to the deployed Seller App. The seller-api.ts code is already written to make real calls when the env var is present.
-
----
-
-## R11 — Mercado Pago (not applicable)
-
-### Requirement
-Integración con Mercado Pago (solo para la Payments App) — flujo de pago en modo sandbox.
-
-### Status
-**NOT APPLICABLE**
-
-Mercado Pago integration is the responsibility of the Payments App (Rocco Paoloni), not the Buyer App. The Buyer App only consumes the checkout URL returned by Payments.
-
----
-
-## R12 — AI Features (Optional)
-
-### Requirement
-Opcional — IA — se puede incorporar funcionalidad basada en inteligencia artificial.
-
-### Status
-**NOT IMPLEMENTED**
-
-No AI features present. This is optional and has no impact on grading.
-
----
-
-## R13 — Deployment Readiness
-
-### Requirement
-Aplicación web funcional — deployada en Vercel y accesible mediante un link de producción.
-
-### Status
-**UNKNOWN — CRITICAL CONCERN**
-
-### Evidence
-- Next.js 16 with App Router — Vercel compatible
-- `package.json` build script: `prisma generate && next build --webpack`
-- No `vercel.json` — auto-detection will handle this
-- Database URLs configured in `.env`
-
-### Issues
-- **No deploy URL anywhere in the README or codebase**. There is no link to a deployed Vercel instance.
-- **`--webpack` flag** in `npm run build` forces Webpack bundler instead of Turbopack. This is non-standard and could cause build issues. Vercel may not support this flag in all configurations.
-- **Missing Clerk middleware** will cause auth to break in production even if build succeeds.
-- **`next.config.ts` only allows images from `upload.wikimedia.org`**. In production with real Seller App data, product images from other domains will be blocked.
-
-### Risk During Evaluation
-**CRITICAL**. The delivery requires a live Vercel URL. If there's no deployed instance, it's an automatic point deduction.
-
-### Recommendation
-**MUST**: Deploy to Vercel before submission. Add the URL to README. Fix middleware.ts before deploying.
-
----
-
-## R14 — Seed / Sample Data
-
-### Requirement
-Datos cargados — la aplicación no puede estar vacía.
-
-### Status
-**PARTIAL**
-
-### Evidence
-- `prisma/seed.ts` exists with comprehensive seed data:
-  - 3 mock products across 3 sellers
-  - Multiple addresses per profile
-  - Cart with items
-  - Favorites
-  - Multiple orders in different states (COMPLETED, PENDING_PAYMENT, PAID, IN_TRANSIT)
-  - Order status history
-
-### Issues
-- **No seed script in `package.json`**. The `seed.ts` exists but there's no `"seed": "tsx prisma/seed.ts"` script in package.json, and no `prisma.seed` configuration in package.json. A new developer cloning the repo cannot run the seed without knowing to run `npx tsx prisma/seed.ts` manually.
-- **Seed depends on existing buyer profiles** — the seed function `seedProfile(profileId, email)` takes an existing profile ID as argument. Without knowing how to get/create a profile, the seed is non-trivial to run.
-- **Mock products in seed don't match real Seller App schema** — `price: 450000` (in pesos) vs documented `price_cents: 45000000` (in centavos).
-
-### Risk During Evaluation
-MEDIUM. If the evaluator can't see data in the deployed app, it's a direct point deduction. The seed needs to be runnable.
-
-### Recommendation
-Add to `package.json`: `"seed": "tsx prisma/seed.ts"`. Add documentation on how to run seed and with which user.
-
----
-
-## R15 — README Requirements
-
-### Requirement
-README — breve y conciso, debe incluir: descripción de la app, link al deploy, y credenciales o instrucciones para acceder con cada tipo de usuario.
-
-### Status
-**FAIL**
-
-### Evidence
-README exists with: app description, tech stack, setup instructions, route table, API table, command reference.
-
-### Issues
-- **No deploy link** — The README has no URL to the deployed Vercel instance.
-- **No admin credentials** — No instructions for accessing the admin panel or which Clerk user has `publicMetadata.admin = true`.
-- **No buyer user credentials** — No test user email/password for the evaluator to log in as a buyer.
-- **README is excessively long** — The assignment says "breve y conciso" but the README is extensive with folder structure, all API routes, all commands. This is not the requested format.
-
-### Risk During Evaluation
-**HIGH**. The README requirements are explicitly stated in the rubric. Missing deploy link and credentials are automatic deductions.
-
-### Recommendation
-**MUST FIX BEFORE SUBMISSION**: Add a brief section at the top of README with:
-1. Vercel deploy URL
-2. Admin user credentials (email + password or how to create one)
-3. Buyer user credentials (email + password for a pre-seeded account)
-
----
-
-## R16 — Environment Variables and `.env.example`
-
-### Requirement
-Variables de entorno — usar `.env.local` para desarrollo, configurar en Vercel. Incluir `.env.example` con los nombres de las variables (sin valores).
-
-### Status
-**FAIL**
-
-### Evidence
-- `.env` file exists locally (properly .gitignored via `.env*` rule)
-- No `.env.example` file exists anywhere in the repository
-
-### Issues
-- **`.env.example` is completely missing** — the assignment explicitly requires this file.
-- **The required env vars are scattered** — `SELLER_APP_URL`, `SHIPPING_APP_URL`, `PAYMENTS_APP_URL`, `PAYMENTS_TO_BUYER_SERVICE_TOKEN`, `SHIPPING_TO_BUYER_SERVICE_TOKEN`, `SELLER_TO_BUYER_SERVICE_TOKEN` are referenced in source code but never documented in one place.
-
-### Risk During Evaluation
-**HIGH**. The absence of `.env.example` is explicitly mentioned in the rubric as a requirement.
-
-### Recommendation
-**MUST FIX BEFORE SUBMISSION**: Create `.env.example`:
+In `checkout/route.ts`, replace:
+```ts
+const payment = await createPaymentSession(order.id, totalCents);
 ```
-DATABASE_URL=
-DIRECT_URL=
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
-CLERK_SECRET_KEY=
-SELLER_APP_URL=
-SHIPPING_APP_URL=
-PAYMENTS_APP_URL=
-BUYER_TO_SELLER_SERVICE_TOKEN=
-BUYER_TO_SHIPPING_SERVICE_TOKEN=
-BUYER_TO_PAYMENTS_SERVICE_TOKEN=
-PAYMENTS_TO_BUYER_SERVICE_TOKEN=
-SHIPPING_TO_BUYER_SERVICE_TOKEN=
-SELLER_TO_BUYER_SERVICE_TOKEN=
+with:
+```ts
+const payment = await createPayment({ order_id: order.id, amount_cents: totalCents, ... });
 ```
+And delete or rename the mock `createPaymentSession` in `buyer-service.ts`.
 
 ---
 
-## R17 — .gitignore Protections
+## REQ-15: Mocking of Inter-App Integrations
 
-### Requirement
-Never commit secrets.
-
-### Status
-**PASS**
+### Status: PASS (with caveats)
 
 ### Evidence
-`.gitignore` includes `.env*` — all env files (`.env`, `.env.local`, `.env.example`) are ignored. Note: `.env.example` should NOT be ignored since it contains only variable names, no values. Consider using `!.env.example` exception.
+- `seller-api.ts` — falls back to `MOCK_PRODUCTS` when `SELLER_APP_URL` or `BUYER_TO_SELLER_SERVICE_TOKEN` is missing
+- `shipping-api.ts` — falls back to `buildMockResponse()` when `SHIPPING_APP_URL` or `BUYER_TO_SHIPPING_SERVICE_TOKEN` is missing
+- `payments-api.ts` — falls back to mock session when `PAYMENTS_APP_URL` or `BUYER_TO_PAYMENTS_SERVICE_TOKEN` is missing (but this function is never called from checkout)
 
 ### Issues
-- `.env.example` would be gitignored by the current `.env*` rule. Add `!.env.example` to `.gitignore` so the example file CAN be committed.
+- Mock fallback for Payments is in `payments-api.ts::createPayment` but checkout calls `buyer-service.ts::createPaymentSession` which is always mock.
+- Inter-app incoming endpoints (those receiving calls FROM Payments/Shipping/Seller) will return **HTTP 500** when the service token env vars are not configured (`service-auth.ts:9`).
+
+### Risk During Evaluation
+Medium. The mocking for outgoing calls works, but incoming mocking is broken.
 
 ---
 
-## Summary Table
+## REQ-16: Mercado Pago Sandbox
 
-| Requirement | Status | Priority |
-|---|---|---|
-| Next.js pages/components | PASS | — |
-| Own REST API | PARTIAL | HIGH |
-| PostgreSQL ownership | PASS | — |
-| Authentication | PARTIAL | **CRITICAL** |
-| Admin panel | PARTIAL | HIGH |
-| Search & pagination | PARTIAL | HIGH |
-| Error handling & 404 | PASS | — |
-| Server-side validation | PASS | — |
-| Accessibility | PARTIAL | MEDIUM |
-| External API consumption | PARTIAL | MEDIUM |
-| Deployment | UNKNOWN | **CRITICAL** |
-| Seed data | PARTIAL | HIGH |
-| README | FAIL | **CRITICAL** |
-| `.env.example` | FAIL | **CRITICAL** |
-| `.gitignore` protections | PASS | — |
+### Status: FAIL
+
+### Evidence
+- Buyer App does not integrate directly with Mercado Pago (by design — that's Payments App's job)
+- `payments-api.ts` has correct structure for calling Payments App which would trigger MP
+
+### Issues
+- Due to the bug in REQ-14 (wrong function called), Mercado Pago is never reached even indirectly.
+- No Mercado Pago credentials in `.env` or `.env.example` (correct — that belongs in Payments App).
+
+### Risk During Evaluation
+Medium. If the system is meant to be demonstrated end-to-end, this will block the demo.
+
+---
+
+## REQ-17: Deployment Readiness
+
+### Status: PARTIAL — see `05-deployment-readiness.md` for full analysis.
+
+---
+
+## REQ-18: Seed / Sample Data
+
+### Status: PASS (with inconsistency)
+
+### Evidence
+- `prisma/seed.ts` creates: 1 address, 1 cart with 2 items, 3 favorites, 2 orders (COMPLETED + PENDING_PAYMENT) per existing buyer profile
+- `npm run seed` script configured in `package.json`
+- Seed is idempotent — deletes and recreates carts/orders
+
+### Issues
+- **Price inconsistency**: seed defines Trek Marlin price as `450000` (ARS 4,500) but `seller-api.ts` mock has `130000000` (ARS 1,300,000). The products are the same by ID but have completely different prices. Orders in the DB will show ARS 4,500 for a Trek Marlin while the shop shows ARS 1,300,000.
+- Seed requires that at least one buyer profile exists first (must log in before seeding). README mentions this but it's a friction point.
+- Only 3 mock products in seed vs 12 in the seller-api mock. Favorited products will point to valid IDs, but the cart only contains 2 products.
+
+### Risk During Evaluation
+Low-Medium. Price discrepancy between orders and shop display is visually odd.
+
+### Recommendation
+Align prices between `seed.ts` and `seller-api.ts` MOCK_PRODUCTS.
+
+---
+
+## REQ-19: README Requirements
+
+### Status: PARTIAL — see `08-readme-audit.md`.
+
+---
+
+## REQ-20: Environment Variables
+
+### Status: PARTIAL
+
+### Evidence
+- `.env.example` exists with all required keys (commented out)
+- Real `.env` has `DATABASE_URL`, `DIRECT_URL`, Clerk keys, and `SELLER_APP_URL` configured
+- `.gitignore` correctly excludes `.env*` (with `!.env.example` exception)
+
+### Issues
+- Most service tokens are **commented out** in `.env`: `BUYER_TO_SHIPPING_SERVICE_TOKEN`, `BUYER_TO_PAYMENTS_SERVICE_TOKEN`, `PAYMENTS_TO_BUYER_SERVICE_TOKEN`, `SHIPPING_TO_BUYER_SERVICE_TOKEN`, `SELLER_TO_BUYER_SERVICE_TOKEN`
+- Only `BUYER_TO_SELLER_SERVICE_TOKEN` is set (but the real Seller App is connected)
+- `PAYMENTS_APP_URL` has a **trailing space**: `https://proyecto-c-payments-bicimarket.vercel.app/ ` — this may cause connection issues
+- `SHIPPING_APP_URL` is set to `https://proyecto-c-shipping-bicimarket.vercel.app/` but `BUYER_TO_SHIPPING_SERVICE_TOKEN` is commented out, meaning shipping calls will use mock
+
+### Risk During Evaluation
+**HIGH**. With most tokens missing, the inter-app endpoints will return HTTP 500 when called by other apps.
+
+### Recommendation
+Fill in all service tokens. Verify with the other teams what secrets they expect.
+
+---
+
+## REQ-21: .gitignore Protections
+
+### Status: PASS
+
+### Evidence
+- `.gitignore` excludes `.env*` with `!.env.example` exception
+- `/src/generated/prisma` excluded (good — generated code)
+- `/node_modules`, `/.next/`, `build` excluded
+
+### Issues
+- **`src/components/admin/.orders-table.tsx.swp`** — a Vim swap file appears to be committed to the repository. This is not harmful but is unprofessional and pollutes the repo.
+
+### Recommendation
+Delete the swap file and add `*.swp` to `.gitignore`.

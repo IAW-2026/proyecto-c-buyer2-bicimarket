@@ -15,19 +15,22 @@ const SELLER_TO_BUYER_CATEGORY: Record<string, string> = {
 };
 
 function toProduct(p: SellerProduct): Product {
+  const description = p.description
+    ?? [p.brand, p.model].filter(Boolean).join(" ")
+    ?? "";
   return {
     id: p.id,
     title: p.title,
-    description: p.description,
+    description,
     priceCents: p.price_cents,
     weightGrams: p.weight_grams,
     imageUrl: p.main_image_url,
     sellerId: p.seller_profile_id,
-    sellerName: p.seller_name,
+    sellerName: p.seller_name ?? p.seller_profile_id,
     category: SELLER_TO_BUYER_CATEGORY[p.category] ?? null,
     isActive: p.status === "active",
     createdAt: p.created_at,
-    updatedAt: p.updated_at,
+    updatedAt: p.updated_at ?? p.created_at,
   };
 }
 

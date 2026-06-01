@@ -1,187 +1,200 @@
 # 03 — Architecture Review
-> Audit generated: 2026-05-31
 
 ---
 
 ## 1. Folder Structure
 
+### Assessment: GOOD
+
 ```
 src/
-├── app/
-│   ├── (auth)/          # Protected buyer pages (layout checks auth)
-│   ├── admin/           # Admin pages (layout checks admin flag)
-│   ├── shop/            # Public product catalog
+├── app/              # Next.js App Router (pages + API routes)
+│   ├── (auth)/       # Protected buyer pages (layout redirects)
+│   ├── admin/        # Admin pages (layout checks admin flag)
 │   ├── api/
-│   │   ├── v1/buyer/    # Buyer-facing REST API (JWT auth)
-│   │   ├── v1/orders/   # Inter-service REST API (X-Service-Token)
-│   │   ├── admin/       # Admin REST API (JWT + admin flag)
-│   │   └── products/    # Public products proxy
-├── components/
-│   ├── ui/              # shadcn/ui primitives
-│   ├── admin/           # Admin-specific components
-│   ├── buyer/           # Buyer domain components
-│   ├── cart/            # Cart components
-│   ├── checkout/        # Checkout components
-│   ├── dashboard/       # Dashboard widgets
-│   ├── favorites/       # Favorites components
-│   ├── header/          # Header components
-│   ├── layout/          # Layout components (sidebar, bottom nav)
-│   ├── orders/          # Order components
-│   ├── profile/         # Profile components
-│   ├── shared/          # Cross-domain components
-│   └── shop/            # Shop-specific components
-├── hooks/
-│   ├── querys/          # React Query mutation hooks (typo: should be "queries")
-│   └── use-*.ts         # Custom hooks
-├── lib/                 # Services, utilities, external clients
-├── providers/           # React context providers
-├── services/api/        # Axios API call functions
-├── store/               # Zustand stores
-└── types/               # TypeScript type definitions
+│   │   ├── v1/       # Versioned API (correct)
+│   │   │   ├── buyer/    # UI-facing endpoints
+│   │   │   └── orders/   # Inter-app endpoints
+│   │   ├── admin/    # Admin REST APIs (not under v1 — see issue below)
+│   │   ├── products/ # Proxy to Seller App (not under v1 — issue)
+│   │   ├── docs/     # OpenAPI spec route
+│   │   └── health/   # Health check
+│   ├── shop/         # Catalog
+│   ├── sign-in/
+│   └── sign-up/
+├── components/       # UI components by domain
+├── hooks/            # React Query hooks and custom hooks
+│   └── querys/       # Mutation hooks organized by domain
+├── lib/              # Business logic and service clients
+├── providers/        # React context providers
+├── services/api/     # API function modules (partially redundant with hooks)
+├── store/            # Zustand stores
+└── types/            # TypeScript type definitions
 ```
 
-**Assessment**: Structure is well-organized and follows Next.js App Router conventions. The separation of `/api/v1/buyer/` (JWT) vs `/api/v1/orders/` (service token) is clean and follows the spec. The `lib/` directory correctly houses service clients and business logic.
+### Issues
 
-**Problem**: `hooks/querys/` is misspelled (should be `queries`). Minor but visible.
+**Severity: MINOR** — Admin API routes (`/api/admin/...`) are not under `/api/v1/`. This deviates from the global rule that all API routes live under `/api/v1/...`.
+
+**Severity: MINOR** — Product proxy routes (`/api/products/`, `/api/products/[productId]`) are not under `/api/v1/`. They exist alongside versioned routes.
+
+**Severity: MINOR** — `src/services/api/` and `src/hooks/querys/` have partial overlap in responsibility (both deal with API calls), creating confusion about where to put new functionality.
 
 ---
 
 ## 2. Separation of Concerns
 
-**Severity: MEDIUM**
+### Assessment: GOOD
 
-### Good
-- Business logic is in `lib/buyer-service.ts`, not in route handlers
-- External app clients are isolated in `lib/seller-api.ts`, `lib/shipping-api.ts`, `lib/payments-api.ts`
-- Auth logic centralized in `lib/admin-auth.ts` and `lib/service-auth.ts`
-- Types separated: `types/buyer.ts` (domain), `types/api.ts` (generic), `types/inter-service.ts` (contracts)
+- API routes handle HTTP concerns; business logic delegated to `lib/`
+- `buyer-service.ts` contains pure domain functions (`getOrCreateBuyerProfile`, `calculateCartTotals`, `groupItemsBySeller`)
+- Service clients (`seller-api.ts`, `shipping-api.ts`, `payments-api.ts`) are thin HTTP wrappers with mock fallback
+- Prisma singleton in `lib/prisma.ts` prevents multiple client instances
 
-### Problems
-- **`createPaymentSession` in `lib/buyer-service.ts` is hardcoded mock** (lines 44–50):
-  ```typescript
-  export async function createPaymentSession(orderId: string, totalCents: number) {
-    return {
-      paymentId: `pay_${orderId}`,
-      paymentUrl: `https://example-payment.local/checkout?order=${orderId}`,
-      totalCents,
-    };
-  }
-  ```
-  This function should be calling `lib/payments-api.ts`, but it's returning a hardcoded localhost URL. The real `createPayment()` function in `payments-api.ts` EXISTS but is never called from the checkout route. **This is the single most critical functional defect.**
+### Issues
 
-- **Shipping cost duplicated between API and UI** — The checkout page (`src/app/(auth)/checkout/page.tsx` lines 68–71) hardcodes the shipping cost calculation:
-  ```typescript
-  const grossCents = 1_000_000 + 400_000 * n;
-  const discountPct = Math.min(0.05 * (n - 1), 0.2);
-  const totalShipping = Math.round(grossCents * (1 - discountPct)) / 100;
-  ```
-  This duplicates the mock formula from `lib/shipping-api.ts`. If the mock changes, the UI display will be wrong. These should be derived from the same source.
+**Severity: IMPORTANT** — `buyer-service.ts` also contains `createPaymentSession` which is a **hardcoded stub** that has no business being in the service layer. It creates a false impression that payment integration is working. This function should either call `payments-api.ts::createPayment` or be removed. Its presence in `buyer-service.ts` caused a critical routing bug where checkout never calls the real Payments App.
 
-- **`services/api/` and `hooks/querys/` layers overlap** — There are two layers making API calls: `services/api/*.ts` (Axios call functions) and `hooks/querys/*/` (React Query mutations calling those functions). This is acceptable but creates extra indirection.
+**Severity: MINOR** — `src/services/api/` (addresses.ts, cart.ts, checkout.ts, favorites.ts, profile.ts) contains Axios API call functions targeting the Buyer App's own API. These are nearly identical in purpose to what `hooks/querys/` does, creating dual paths for the same data. The `hooks/` approach using TanStack Query is the modern pattern; the `services/api/` layer adds complexity without clear benefit.
 
 ---
 
 ## 3. API Design
 
-**Severity: HIGH**
+### Assessment: GOOD (with deviations)
 
-### Good
-- Routes are versioned under `/api/v1/`
-- Correct HTTP verbs used (GET, POST, PATCH, DELETE)
-- Zod validation on all request bodies
-- Consistent 401/403/404 status codes
-- Service token validation reused via `validateServiceToken()`
+- Consistent error format `{ error: { code, message, details } }` across most routes
+- HTTP verbs used correctly (GET/POST/PATCH/DELETE)
+- Zod validation on all inputs
+- Auth checked first in every handler
 
-### Problems
-- **Pagination envelope missing from all list APIs**. The documented format `{ data: [...], pagination: { total, page, limit, has_more } }` is absent. All list endpoints return raw arrays.
-- **Error format inconsistency** across routes:
-  - Checkout: `{ error: "string" }`
-  - Status routes: `{ error: { code, message } }`
-  - Admin routes: `{ error: "Not found" }` or `{ error: { code, message } }`
-- **No `Idempotency-Key` handling** — the spec requires this for POST operations that create resources. The checkout endpoint ignores it entirely.
-- **`PATCH /api/v1/orders/{id}/status` has no state transition validation** — an order can go from any status to any status without checking validity. The spec defines strict transitions (e.g., `COMPLETED` → nothing).
-- **`/api/products` proxy route** does not pass query parameters from the frontend to Seller App. The `GET /api/products` route ignores any `q=`, `category=`, etc. params from the browser.
+### Issues
+
+**Severity: CRITICAL** — `POST /api/v1/buyer/cart` accepts the product snapshot from the client:
+```ts
+unitPriceCents: z.number().int().nonnegative(),
+weightGramsSnapshot: z.number().int().nonnegative(),
+```
+A buyer can send `unitPriceCents: 1` and create a cart item for any product at ARS 0.01. This is a price manipulation vulnerability. The spec says the server must call Seller App to resolve these values.
+
+**Severity: IMPORTANT** — `POST /api/v1/buyer/checkout` accepts `returnUrl` from the client instead of constructing it server-side. A malicious client could pass a `returnUrl` pointing to an external phishing site. Also, `seller_groups` with `shipping_quote_id` are not in the request body — the spec requires these.
+
+**Severity: IMPORTANT** — Checkout hardcodes `shippingCostCents: 0` for each `OrderSellerGroup`:
+```ts
+shippingCostCents: 0,  // line 132 in checkout/route.ts
+```
+While `shippingTotalCents` is calculated correctly at the order level, each seller group shows zero shipping cost. This is incorrect and will mislead downstream apps.
+
+**Severity: MINOR** — No `Idempotency-Key` check on checkout (spec requires it). A double-click could create two orders.
+
+**Severity: MINOR** — `GET /api/v1/buyer/orders/{orderId}` is implemented but the API table in the README lists it as `GET /api/v1/buyer/orders/[id]`. Confirm route `src/app/api/v1/buyer/orders/[orderId]/route.ts` responds correctly — it does exist.
+
+**Severity: MINOR** — Admin API error format inconsistent:
+```ts
+// admin-auth.ts line 13
+return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+// vs everywhere else:
+return NextResponse.json({ error: { code: "UNAUTHORIZED", message: "...", details: {} } }, { status: 401 });
+```
 
 ---
 
 ## 4. Database Design
 
-**Severity: LOW–MEDIUM**
+### Assessment: GOOD (with minor deviations)
 
-### Good
-- Schema accurately represents all 9 required tables
-- Correct use of `@unique` constraints (cart per buyer, cart item per product in cart, favorite per product)
-- `OrderStatusHistory` table implements audit trail
-- Cross-app IDs stored as opaque strings — correct architecture
-- Cascade delete on address → buyer profile
-- Soft delete via `deletedAt` on `BuyerProfile`
+- All required tables present and correctly related
+- Proper use of nullable (`?`) for optional foreign refs to other apps
+- `@@unique` constraints on `(cartId, productId)` and `(buyerProfileId, productId)` — correct
+- `@@unique([orderId, sellerProfileId])` on `OrderSellerGroup` — correct
+- Audit table `OrderStatusHistory` — present and populated
+- Soft delete on `BuyerProfile` (`deletedAt`) — present
+- Cascade delete on `Address` when `BuyerProfile` deleted — present
 
-### Problems
-- **Missing indexes** on several foreign keys:
-  - `OrderItem.orderId` — no explicit index (Prisma may add one automatically for FKs, but not guaranteed)
-  - `OrderItem.sellerGroupId` — same
-  - `OrderSellerGroup.orderId` — should have index for order detail queries
-- **`shippingCostCents` is always stored as 0** per `OrderSellerGroup` even though the `Order.shippingTotalCents` is correct. The per-group shipping breakdown is meaningless.
-- **IDs use raw CUIDs** without the documented `ord_`, `byp_`, `adr_` prefixes. This violates the spec but is otherwise functionally fine.
-- **`OrderStatusHistory.fromStatus` is empty string `""`** when an order is first created (checkout route line 140). This pollutes the audit trail.
+### Issues
+
+**Severity: MINOR** — IDs are generated as bare CUIDs without the resource prefix (`ord_`, `byp_`, etc.) that the documentation mandates. Example: order IDs will be `clxyz123...` instead of `ord_clxyz123...`. This makes log parsing and debugging harder.
+
+**Severity: MINOR** — `OrderStatusHistory` is used for both order-level and seller-group-level status changes (via `source: "seller"` in the seller-group update route). This mixes two different entity types in one audit table. A separate `OrderSellerGroupStatusHistory` would be cleaner.
+
+**Severity: MINOR** — `CartItem` does not have `deleted_at` — if needed to audit removed items this is a gap (acceptable for this scope).
+
+**Severity: INFO** — Only 2 migrations despite likely multiple schema iterations. This suggests `db push` was used predominantly over `migrate dev`. For an academic project this is acceptable but worth noting.
 
 ---
 
 ## 5. Domain Modeling
 
-**Severity: MEDIUM**
+### Assessment: GOOD
 
-### Good
-- Multi-seller order properly modeled with `Order → OrderSellerGroup → OrderItem`
-- Shipping status mirrored on `OrderSellerGroup` (not just `Order`) — correct per spec
-- Price/weight snapshots correctly captured at cart-add time
+- Domain boundaries are well respected: no cross-app FKs in schema
+- Snapshots stored at time of transaction (`productNameSnapshot`, `unitPriceCents` in cart_items and order_items)
+- `shippingAddressSnapshot` stored as JSON in orders — correct
+- `orderStatusHistory` captures source and payload — correct
 
-### Problems
-- **`Product` type in `types/buyer.ts` uses `price` (pesos) instead of `price_cents` (centavos)**. The spec mandates centavo-based integers. The shop page converts: `unitPriceCents: Math.round((product.price ?? 0) * 100)`. This multiplication assumes `price` is in pesos, which is only true for the mock data. If a real Seller App sends `price_cents`, the cart would store values 100x too large.
-- **`weightGramsSnapshot: 0`** is hardcoded when adding items to cart from the shop page (`shop/page.tsx` line 33). This means all checkout shipping quotes use 0 grams for items added via the UI, making shipping quotes meaningless.
-- **The `SellerGroupStatus` enum has `SETTLED` and `REFUNDED`** but there's no code path that sets them. They're dead states.
+### Issues
+
+**Severity: MINOR** — `Cart.status` enum includes `ABANDONED` but there is no code to mark carts as abandoned. This is dead schema that could confuse a reviewer.
 
 ---
 
 ## 6. Reusability
 
-**Assessment: GOOD**
+### Assessment: GOOD
 
-Shared components (`EmptyState`, `PriceDisplay`, `StatusBadge`, `ProductImage`) are properly factored. The `useApiMutation` generic hook avoids mutation boilerplate. The `validateServiceToken` utility is reused across all inter-service endpoints. The `getOrCreateBuyerProfile` utility centralizes the lazy provisioning pattern.
+- `PaginationControls` — generic and reusable
+- `EmptyState` — generic (icon, title, description props)
+- `StatusBadge` — generic status-to-color component
+- `PriceDisplay` — reusable currency formatter
+- `ProductImage` — image with fallback
+
+### Issues
+
+**Severity: MINOR** — `useApiMutation.tsx` in `hooks/querys/common/` exists but may not be used consistently across all mutation hooks. Some mutations are defined inline in components.
 
 ---
 
 ## 7. Coupling
 
-**Severity: MEDIUM**
+### Assessment: ACCEPTABLE
 
-- The checkout page is tightly coupled to the shipping mock's pricing formula (hardcoded `$10k + $4k/seller`).
-- The `seller-api.ts` mock PRODUCTS array is duplicated in `prisma/seed.ts` — two separate sources of truth for mock data.
-- The shop page passes `weightGramsSnapshot: 0` hardcoded, coupling it to the assumption that weight doesn't matter in checkout (breaks as soon as Seller App is real).
+- Inter-app coupling is contained in `lib/seller-api.ts`, `lib/shipping-api.ts`, `lib/payments-api.ts` — good boundary
+- Mock fallbacks isolate the rest of the app from unavailable services
+- `service-client.ts` is a single factory for all outbound service calls
+
+### Issues
+
+**Severity: IMPORTANT** — The checkout route imports from both `lib/buyer-service.ts` AND `lib/shipping-api.ts` but then calls `buyer-service.ts::createPaymentSession` (wrong function) instead of `lib/payments-api.ts::createPayment` (correct function). This tight coupling of the wrong function creates the critical payment bug.
 
 ---
 
 ## 8. Scalability
 
-This is an academic project — scalability concerns are minor. However:
+### Assessment: POOR for shop browsing, ACCEPTABLE for everything else
 
-- Loading all products in one request (no server-side pagination) would fail at scale.
-- No caching on the products proxy (`/api/products`) — each page load triggers a new call to Seller App.
-- No rate limiting on any endpoint.
+- API routes are serverless-compatible (Next.js API routes on Vercel)
+- Prisma with connection pooling via Supabase pgBouncer — correct setup
+- Individual buyer operations (cart, orders, addresses) are indexed and fast
+
+### Issues
+
+**Severity: IMPORTANT** — Shop page loads ALL products in one request with no server-side pagination. With a real seller catalog of hundreds of products, this creates a large response payload, slow initial load, and a memory-intensive client-side filter. The architecture needs server-side filtering and pagination before a real product set is connected.
 
 ---
 
 ## 9. Technical Debt
 
-| Item | Location | Severity |
-|---|---|---|
-| `createPaymentSession` is a hardcoded mock | `lib/buyer-service.ts:44–50` | CRITICAL |
-| No `middleware.ts` | project root | CRITICAL |
-| `weightGramsSnapshot: 0` in shop add-to-cart | `shop/page.tsx:33` | HIGH |
-| Shipping cost duplicated in checkout UI | `checkout/page.tsx:68–71` | HIGH |
-| 26+ UI components with `@ts-nocheck` | `components/ui/` | MEDIUM |
-| `hooks/querys/` misspelling | directory name | LOW |
-| `OrderStatusHistory` with empty `fromStatus` | checkout route line 140 | MEDIUM |
-| No pagination in any list endpoint | all API routes | HIGH |
-| Product price in pesos vs spec centavos | `types/buyer.ts`, `seller-api.ts` | HIGH |
-| Products proxy ignores filter params | `api/products/route.ts` | MEDIUM |
+| Item | File | Severity | Notes |
+|---|---|---|---|
+| `createPaymentSession` stub | `buyer-service.ts:44-50` | CRITICAL | Blocks real payment flow |
+| Price from client in cart | `cart/route.ts:7-15` | IMPORTANT | Security vulnerability |
+| No middleware.ts | (missing) | IMPORTANT | Clerk protection gap |
+| `shippingCostCents: 0` per group | `checkout/route.ts:132` | IMPORTANT | Data incorrect |
+| Vim swap file committed | `.orders-table.tsx.swp` | MINOR | Clutter |
+| Non-v1 admin/products routes | `api/admin/`, `api/products/` | MINOR | Spec deviation |
+| Bare CUID IDs (no prefix) | `schema.prisma` | MINOR | Spec deviation |
+| Price inconsistency in seed | `seed.ts` | MINOR | Confusing demo data |
+| No retry logic | `service-client.ts` | MINOR | Spec deviation |
+| No X-Request-Id propagation | `service-client.ts` | MINOR | Spec deviation |
+| Dead `ABANDONED` cart status | `schema.prisma` | MINOR | Dead code |
+| Duplicate service layer | `services/api/` vs `hooks/querys/` | MINOR | Redundant abstraction |

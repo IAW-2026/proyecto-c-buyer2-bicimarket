@@ -1,18 +1,19 @@
-# 04 — Specification Deviations
-> Audit generated: 2026-05-31
+# 04 — Specification vs Implementation Deviations
 
-All deviations are between `/documentacion` (source of truth) and the implementation.
+> Source of truth: `documentacion/03-apis.md`, `documentacion/04-modelo-de-datos.md`, `documentacion/02-responsabilidades.md`
 
 ---
 
-## DEV-01 — Payment Session is Fully Mocked
+## DEV-01: Checkout Payment Integration (CRITICAL)
 
 ### Expected
-`documentacion/02-responsabilidades.md §3.2`: Buyer App must call `POST /api/v1/payments` at Payments App to initiate the charge. The function should call the Payments App via `lib/payments-api.ts`.
+`documentacion/03-apis.md §P1`: Buyer App calls `POST /api/v1/payments` on Payments App, receives `{ payment_id, checkout_url }`, stores `payment_id`, and redirects buyer to `checkout_url`.
+
+`documentacion/02-responsabilidades.md §3.2`: Buyer App must "Disparar el cobro hacia Payments con un `Idempotency-Key` único por orden."
 
 ### Actual
-`src/lib/buyer-service.ts:44–50`:
-```typescript
+`src/app/api/v1/buyer/checkout/route.ts:168` calls `createPaymentSession` from `lib/buyer-service.ts`, which returns a **hardcoded mock**:
+```ts
 export async function createPaymentSession(orderId: string, totalCents: number) {
   return {
     paymentId: `pay_${orderId}`,
@@ -21,331 +22,359 @@ export async function createPaymentSession(orderId: string, totalCents: number) 
   };
 }
 ```
-The `createPayment()` function exists in `lib/payments-api.ts` and IS correctly implemented to call Payments App (with mock fallback), but `createPaymentSession` in `buyer-service.ts` never calls it. This is a stub that was never replaced.
+`lib/payments-api.ts::createPayment` (the correct function that would call the real Payments App) **is never invoked** by the checkout flow.
 
 ### Files Involved
-- `src/lib/buyer-service.ts:44–50`
-- `src/lib/payments-api.ts` (the real implementation that is never called)
-- `src/app/api/v1/buyer/checkout/route.ts:155` (calls `createPaymentSession`)
+- `src/app/api/v1/buyer/checkout/route.ts` (line 168)
+- `src/lib/buyer-service.ts` (lines 44-50)
+- `src/lib/payments-api.ts` (correct implementation, unused in checkout)
 
 ### Impact
-The checkout flow never calls Payments App. The `paymentUrl` returned to the user is `https://example-payment.local/checkout?...` which is unreachable. The order is created but the user is redirected to a non-existent page. **Checkout is fundamentally broken in production.**
+Checkout is completely broken in production. The buyer is redirected to `https://example-payment.local/...` which does not exist. No real payment is ever initiated. Even when `PAYMENTS_APP_URL` is set correctly, the Payments App is never contacted during checkout.
 
 ### Is the deviation justified?
-**NO**
-
-### Explanation
-This appears to be an incomplete implementation — `payments-api.ts` has the real code but `buyer-service.ts` still has the stub. This is likely a missed step during development.
+**NO.** The `payments-api.ts` file already has the correct implementation ready to use. This appears to be an integration oversight where the developer wrote the mock in `buyer-service.ts` during development and forgot to replace it with the real call.
 
 ### Required Action
-**MUST FIX**: Replace `createPaymentSession` call with `createPayment()` from `lib/payments-api.ts`, passing the proper payload.
-
----
-
-## DEV-02 — No Clerk Middleware
-
-### Expected
-`documentacion/07-clerk-autenticacion.md` (doc referencias): Clerk requires a middleware for auth state propagation.
-
-### Actual
-No `middleware.ts` file exists in the project root or `src/`. The Clerk SDK is installed but not initialized at the edge.
-
-### Files Involved
-- `middleware.ts` — does not exist
-- `src/app/(auth)/layout.tsx` — does its own `auth()` check but without middleware the session may not be properly set
-
-### Impact
-Without Clerk middleware:
-1. `auth()` calls in server components may return `{ userId: null }` even for authenticated users in production.
-2. Routes are not protected at the CDN/edge level — auth checks are only at the server component level.
-3. Clerk's `<ClerkProvider>` client-side state won't be properly synced.
-4. The deployed Vercel app may have intermittent or total auth failures.
-
-### Is the deviation justified?
-**NO** — this is a missing required configuration
-
-### Explanation
-The middleware is required for `@clerk/nextjs` v7 to function correctly in production. Its absence is a setup omission.
-
-### Required Action
-**MUST FIX**: Create `middleware.ts` in project root with Clerk middleware configuration.
-
----
-
-## DEV-03 — Price in Pesos vs Centavos
-
-### Expected
-`documentacion/03-apis.md §0.7`: "Montos en centavos como entero (`amount_cents: 1599900` = ARS 15.999,00)." All prices must be integers in centavos.
-
-### Actual
-`src/lib/seller-api.ts` mock data uses prices in pesos:
-```typescript
-{ price: 450000 }  // This should be price_cents: 45000000
+In `checkout/route.ts`, replace the call to `createPaymentSession` with a call to `createPayment` from `payments-api.ts`:
+```ts
+import { createPayment } from "@/lib/payments-api";
+// ...
+const payment = await createPayment({
+  order_id: order.id,
+  buyer_clerk_user_id: userId,
+  buyer_profile_id: profile.id,
+  amount_cents: totalCents,
+  currency: "ARS",
+  items_summary: groupedData.map(g => ({
+    seller_profile_id: g.sellerProfileId,
+    subtotal_cents: g.itemsSubtotalCents,
+    shipping_cost_cents: g.shippingCostCents,
+  })),
+  idempotency_key: crypto.randomUUID(),
+  return_urls: {
+    success: `${process.env.NEXT_PUBLIC_APP_URL}/orders/${order.id}?payment=success`,
+    failure: `${process.env.NEXT_PUBLIC_APP_URL}/orders/${order.id}?payment=failure`,
+    pending: `${process.env.NEXT_PUBLIC_APP_URL}/orders/${order.id}?payment=pending`,
+  },
+});
 ```
 
-`src/types/inter-service.ts` `SellerProduct` type uses `price: number` field, not `price_cents`.
-
-`src/app/shop/page.tsx:33`:
-```typescript
-unitPriceCents: Math.round((product.price ?? 0) * 100),
-```
-This assumes `price` is in pesos and multiplies by 100 to get centavos.
-
-### Files Involved
-- `src/lib/seller-api.ts` (mock prices in pesos)
-- `src/types/inter-service.ts` (`price` field naming)
-- `src/app/shop/page.tsx:33` (conversion `* 100`)
-
-### Impact
-If the real Seller App (following spec) sends `price_cents: 45000000`, the Buyer App would store `4500000000` (100x too large) in `cart.unitPriceCents`. This would corrupt all order totals. The mock works because the mock prices ARE in pesos, but the real integration would break.
-
-### Is the deviation justified?
-**NO** — this is an incorrect mapping of the documented contract
-
-### Explanation
-The mock data and types don't follow the `price_cents` convention from the spec. When the real Seller App is connected, all price handling will be wrong.
-
-### Required Action
-Rename `price` to `price_cents` in `SellerProduct` type, update mock data to use centavo values, remove the `* 100` multiplication.
-
 ---
 
-## DEV-04 — Pagination Missing from All List APIs
+## DEV-02: Cart POST — Client-Supplied Price Data
 
 ### Expected
-`documentacion/02-responsabilidades.md §4`: "GET de listado devuelve `{ data: [...], pagination: { total, page, limit, has_more } }`. Default `limit=20`, máximo `limit=100`."
+`documentacion/03-apis.md §B3`: `POST /api/v1/buyer/cart` request body is `{ "product_id": "prd_01H…", "quantity": 1 }`. The documentation states: "Buyer App llama internamente a `GET /api/v1/products/{id}/availability` en Seller App para resolver `seller_profile_id`, `unit_price_cents`, `weight_grams`."
 
 ### Actual
-All list endpoints return raw arrays without the pagination envelope:
-- `GET /api/v1/buyer/orders` → returns `Order[]`
-- `GET /api/v1/buyer/addresses` → returns `Address[]` (implied from usage)
-- `GET /api/admin/orders` → returns `Order[]`
-- `GET /api/admin/buyers` → returns `BuyerProfile[]`
-
-None support `?page=` or `?limit=` query parameters.
+`src/app/api/v1/buyer/cart/route.ts:7-15` accepts and validates:
+```ts
+const cartItemSchema = z.object({
+  productId: z.string().min(1),
+  sellerProfileId: z.string().min(1),
+  productNameSnapshot: z.string().min(1),
+  unitPriceCents: z.number().int().nonnegative(),
+  quantity: z.number().int().positive(),
+  weightGramsSnapshot: z.number().int().nonnegative(),
+  currency: z.string().optional(),
+});
+```
+The server accepts whatever price the client sends, never calls Seller App.
 
 ### Files Involved
-- `src/app/api/v1/buyer/orders/route.ts`
-- `src/app/api/admin/orders/route.ts`
-- `src/app/api/admin/buyers/route.ts`
-- `src/app/api/admin/carts/route.ts`
+- `src/app/api/v1/buyer/cart/route.ts`
+- `src/lib/seller-api.ts` (has `getProductAvailability` — unused in cart route)
+- `src/app/shop/page.tsx` (the frontend that sends all product data from mock)
 
 ### Impact
-APIs don't follow the documented contract. External apps consuming these endpoints (in Etapa 3) would get unexpected response shapes. Admin and buyer UIs would load all records at once, breaking with real data.
+- **Security**: Buyer can set `unitPriceCents: 1` for any product, creating orders at ARS 0.01
+- **Spec violation**: Seller App availability is never verified before adding to cart
+- **Functional**: Products added to cart may reflect stale prices if mock changes
 
 ### Is the deviation justified?
-**NO**
-
-### Explanation
-Pagination is explicitly required by the assignment rubric AND the inter-service contract documentation.
+**NO.** The availability check is both a business requirement (confirm product is active) and a security requirement (server-side price resolution). The deviation is a development shortcut.
 
 ### Required Action
-Add `page`/`limit` query param parsing and wrap all list responses in `{ data, pagination }` envelope.
+Modify `cart/route.ts` to accept only `{ productId, quantity }`, then call `getProductAvailability(productId)` to resolve seller ID, price, and weight. Return 409 if product is not active.
 
 ---
 
-## DEV-05 — Weight Snapshot is Always 0
+## DEV-03: Checkout Schema — Missing seller_groups Array
 
 ### Expected
-`documentacion/04-modelo-de-datos.md §1.1 cart_items`: `weight_grams_snapshot` must capture the actual weight of the product at cart-add time for use in shipping quotes.
+`documentacion/03-apis.md §B5` checkout request:
+```json
+{
+  "shipping_address_id": "adr_01H…",
+  "seller_groups": [
+    { "seller_profile_id": "slp_01H…", "shipping_quote_id": "qte_01H…" },
+    { "seller_profile_id": "slp_02H…", "shipping_quote_id": "qte_02H…" }
+  ],
+  "notes": "..."
+}
+```
 
 ### Actual
-`src/app/shop/page.tsx:33`:
-```typescript
-weightGramsSnapshot: 0,
+`src/app/api/v1/buyer/checkout/route.ts:12-16`:
+```ts
+const checkoutSchema = z.object({
+  shippingAddressId: z.string().min(1),
+  notes: z.string().optional(),
+  returnUrl: z.string().url(),
+});
 ```
-When a user adds a product to cart from the shop UI, the weight is always stored as 0 grams.
+No `seller_groups` or `shipping_quote_id`. The checkout calls Shipping App internally and generates quotes without storing or validating `quote_id`.
 
 ### Files Involved
-- `src/app/shop/page.tsx:33`
+- `src/app/api/v1/buyer/checkout/route.ts`
+- `src/lib/shipping-api.ts`
 
 ### Impact
-Shipping quotes are calculated with 0-gram packages. The mock shipping API ignores this (uses a fixed formula), but a real Shipping App would return incorrect quotes or reject the request.
+- Shipping quotes are never persisted with TTL validation — a quote cannot expire because it's never stored
+- `shippingQuoteId` on `OrderSellerGroup` is always `null` (set to null implicitly since never provided)
+- Actually: the code does set `shippingQuoteId: "quote_seed_002"` in seed but the real checkout never provides it
+- Downstream systems (Seller App, Shipping App) cannot validate a quote against a stored record
 
 ### Is the deviation justified?
-**PARTIALLY** — The `weight_grams` field exists in the `SellerProduct` type but the shop page doesn't pass it when adding to cart.
-
-### Explanation
-The shop page `handleAddToCart` function doesn't access `product.weight_grams` (which is available in `SellerProduct` but may not be mapped into the `Product` type used in the shop UI).
+**PARTIALLY**. If Shipping App is mocked (no real quote TTL enforcement), this works. But it breaks the contract when real apps are integrated.
 
 ### Required Action
-Pass `product.weight_grams ?? 0` → map `SellerProduct.weight_grams` through to `Product` type → use it in `handleAddToCart`.
+Accept `seller_groups` with `shipping_quote_id` in the checkout schema, OR document explicitly that quote IDs are not stored/validated in this implementation.
 
 ---
 
-## DEV-06 — ID Format Without Resource Prefixes
+## DEV-04: OrderSellerGroup.shippingCostCents Always Zero
+
+### Expected
+`documentacion/04-modelo-de-datos.md §1.1`: `order_seller_groups.shipping_cost_cents` should reflect "el costo de envío cotizado para este grupo."
+
+### Actual
+`src/app/api/v1/buyer/checkout/route.ts:132`:
+```ts
+shippingCostCents: 0,
+```
+The total shipping is calculated correctly (`shippingTotalCents` in `Order`), but the per-group breakdown always shows 0.
+
+### Files Involved
+- `src/app/api/v1/buyer/checkout/route.ts` (line 132)
+
+### Impact
+- `OrderSellerGroup.shippingCostCents` is always 0 in the DB
+- API responses for order detail will show 0 shipping per seller group
+- Downstream apps (Seller App receiving sales_order) may receive incorrect `shipping_cost_cents`
+- Admin panel showing per-group cost will be wrong
+
+### Is the deviation justified?
+**NO.** The shipping quotes are calculated by `getShippingQuotes` and `total_net_cents` is available. The per-group cost needs to be distributed from this total.
+
+### Required Action
+Distribute shipping cost per seller group. The simplest approach: divide `shippingTotalCents` equally or use per-group quote if available.
+
+---
+
+## DEV-05: No Idempotency-Key Support
+
+### Expected
+`documentacion/02-responsabilidades.md §2` Rule 5: "todo POST que crea recursos acepta header `Idempotency-Key`."
+`documentacion/03-apis.md §B5`: "`POST /api/v1/buyer/checkout` — **Idempotency-Key obligatorio.**"
+
+### Actual
+Checkout (`checkout/route.ts`) reads the request body but never reads the `Idempotency-Key` header. No deduplication logic exists.
+
+### Files Involved
+- `src/app/api/v1/buyer/checkout/route.ts`
+
+### Impact
+A double-click or network retry could create two identical orders for the same cart.
+
+### Is the deviation justified?
+**NO.** This is explicitly required for checkout.
+
+### Required Action
+Read `Idempotency-Key` header in checkout. Check DB for existing order with that key before creating a new one. Return existing order if found.
+
+---
+
+## DEV-06: Order Cancellation Allows PAID Orders
+
+### Expected
+`documentacion/03-apis.md §B5`: "Solo si `status=pending_payment`."
+
+### Actual
+`src/app/api/v1/buyer/orders/[orderId]/cancel/route.ts:7-11`:
+```ts
+const CANCELLABLE_STATUSES: OrderStatus[] = [
+  "PENDING_PAYMENT",
+  "PAID",
+  "PAYMENT_FAILED",
+];
+```
+Allows cancellation of `PAID` orders, which the spec explicitly forbids.
+
+### Files Involved
+- `src/app/api/v1/buyer/orders/[orderId]/cancel/route.ts`
+
+### Impact
+A buyer could cancel an order that has already been paid, potentially without refund logic being triggered.
+
+### Is the deviation justified?
+**PARTIALLY**. Including `PAYMENT_FAILED` makes sense (buyer should be able to dismiss failed orders). Including `PAID` is incorrect per spec.
+
+### Required Action
+Remove `"PAID"` from `CANCELLABLE_STATUSES`. Consider keeping `PAYMENT_FAILED`.
+
+---
+
+## DEV-07: No middleware.ts for Clerk
+
+### Expected
+`documentacion/05-usuarios.md §3` and Clerk Next.js documentation: authentication should be enforced at the middleware level to protect routes from edge.
+
+### Actual
+No `middleware.ts` in project root or `src/`. Auth is only checked at:
+1. Layout component level (page routes)
+2. Individual API route handlers
+
+### Files Involved
+- (file missing: `src/middleware.ts` or `middleware.ts`)
+
+### Impact
+- Without middleware, Next.js edge runtime does not pre-validate auth tokens before rendering
+- API routes are still protected by individual `auth()` calls, so API security is intact
+- Page routes could briefly render before redirect in SSR, depending on how Clerk handles this
+
+### Is the deviation justified?
+**MINOR**. The app still functions securely for API routes. The gap is primarily about best practice and edge-level protection.
+
+### Required Action
+Add `middleware.ts`:
+```ts
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+const isProtectedRoute = createRouteMatcher(["/(auth)(.*)", "/admin(.*)"]);
+export default clerkMiddleware(async (auth, req) => {
+  if (isProtectedRoute(req)) await auth.protect();
+});
+export const config = { matcher: ["/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)", "/(api|trpc)(.*)"] };
+```
+
+---
+
+## DEV-08: Profile PATCH Missing default_shipping_address_id
+
+### Expected
+`documentacion/03-apis.md §B1`: PATCH profile allows updating `default_shipping_address_id`.
+
+### Actual
+`src/app/api/v1/buyer/profile/route.ts:7-10`:
+```ts
+const updateProfileSchema = z.object({
+  fullName: z.string().min(2).optional(),
+  phone: z.string().optional(),
+});
+```
+No `defaultShippingAddressId` field.
+
+### Files Involved
+- `src/app/api/v1/buyer/profile/route.ts`
+
+### Impact
+Buyer cannot update their default shipping address via API. The UI address selector in checkout would need a workaround.
+
+### Is the deviation justified?
+**NO.** The field is documented as settable.
+
+### Required Action
+Add `defaultShippingAddressId: z.string().optional()` to the profile patch schema.
+
+---
+
+## DEV-09: IDs Without Resource Prefixes
 
 ### Expected
 `documentacion/04-modelo-de-datos.md §0`: "IDs: `String @id @default(cuid())` con prefijo de recurso (`ord_`, `prd_`, etc.) generado en aplicación."
 
 ### Actual
-`prisma/schema.prisma`:
-```prisma
-model Order {
-  id String @id @default(cuid())  // No prefix — generates e.g. "clxyz123..."
-}
-```
-No custom ID generation logic exists. IDs are raw CUIDs.
+`prisma/schema.prisma`: All models use `@id @default(cuid())` with no prefix. IDs are bare CUIDs.
 
 ### Files Involved
-- `prisma/schema.prisma` — all models
+- `prisma/schema.prisma` (all model definitions)
 
 ### Impact
-API responses show IDs like `clxyz123abc456def789` instead of `ord_clxyz123abc456def789`. Inter-service communication relies on these IDs. The deviation is cosmetic but visible during demos and oral defense.
+IDs are not distinguishable by type. Log messages and API responses will show opaque IDs without type context. Less impactful for correctness, more for debuggability.
 
 ### Is the deviation justified?
-**PARTIALLY** — The spec calls for prefixes but raw CUIDs are functionally equivalent. For academic purposes this is acceptable but deviates from the stated contract.
+**PARTIALLY**. Many production apps skip prefixes. In an academic context where the spec explicitly requires them, it's a deviation.
 
 ### Required Action
-Generate IDs with `cuid()` in application code and add prefix before storing. Or accept the deviation and document it.
+Create a helper `createId(prefix: string)` that returns `prefix + cuid()`. Use in model defaults via application-level generation before insert.
 
 ---
 
-## DEV-07 — Shipping Cost Per Group Always 0
+## DEV-10: No X-Request-Id Propagation
 
 ### Expected
-`documentacion/04-modelo-de-datos.md §1.1 order_seller_groups`: `shipping_cost_cents` should contain the shipping cost for that specific seller group.
+`documentacion/02-responsabilidades.md §2` Rule 8: "cada request inter-app lleva `X-Request-Id: <uuid>` que se propaga en cadena."
 
 ### Actual
-`src/app/api/v1/buyer/checkout/route.ts:118`:
-```typescript
-shippingCostCents: 0,  // Always 0
-```
-The total shipping is stored in `Order.shippingTotalCents` but each `OrderSellerGroup.shippingCostCents` is 0.
+`src/lib/service-client.ts` creates Axios instances with `X-Service-Token` but no `X-Request-Id` header.
 
 ### Files Involved
-- `src/app/api/v1/buyer/checkout/route.ts:118`
+- `src/lib/service-client.ts`
 
 ### Impact
-The per-group shipping breakdown shown in order detail views will show $0 per seller group. The total is correct but the breakdown is wrong.
+Cross-app request tracing is not possible. Cannot correlate a buyer checkout with downstream shipping/payment calls in logs.
 
 ### Is the deviation justified?
-**NO** — The quote response contains per-seller costs (`quoteResponse.quotes[i].cost_cents`) which should be mapped to each group.
+**MINOR** for an academic project. Would be critical in production.
 
 ### Required Action
-Map `quoteResponse.quotes.find(q => q.seller_profile_id === g.sellerProfileId)?.cost_cents ?? 0` to `shippingCostCents` in each seller group.
+In `service-client.ts`, add a request interceptor that generates and forwards `X-Request-Id: crypto.randomUUID()`.
 
 ---
 
-## DEV-08 — Admin Layout Missing Navigation
+## DEV-11: No Retry Logic on Inter-App Calls
 
 ### Expected
-The admin panel should be a usable UI with navigation between admin sub-pages.
+`documentacion/02-responsabilidades.md §2` Rule 7: "Si fallan con 5xx o timeout, el emisor reintenta hasta 3 veces con backoff lineal (1s, 3s, 9s)."
 
 ### Actual
-`src/app/admin/layout.tsx`:
-```typescript
-return (
-  <main className="flex-1 overflow-y-auto">
-    {children}
-  </main>
-);
-```
-No sidebar, no header, no navigation. `AdminSidebar` and `AdminHeader` components exist but are not used.
+`src/lib/service-client.ts` creates a plain Axios instance with no retry interceptor. If Seller/Shipping/Payments App returns 5xx, the error propagates immediately.
 
 ### Files Involved
-- `src/app/admin/layout.tsx`
-- `src/components/admin/admin-sidebar.tsx` (exists, unused)
-- `src/components/admin/admin-header.tsx` (exists, unused)
+- `src/lib/service-client.ts`
 
 ### Impact
-Admin panel is navigable only by typing URLs manually. Evaluators who don't know the admin routes won't find the buyers or carts pages.
+Transient failures in other apps will immediately fail the buyer request. For a demo where apps are stable, low impact. In production, high impact.
 
 ### Is the deviation justified?
-**NO**
+**MINOR** for academic scope.
 
 ### Required Action
-Add `AdminSidebar` and `AdminHeader` to admin layout.
+Add axios-retry or a manual retry interceptor in `service-client.ts`.
 
 ---
 
-## DEV-09 — Missing `.env.example`
+## DEV-12: Seed Price Inconsistency
 
 ### Expected
-Assignment requirement: "Incluir en el repositorio un archivo `.env.example` con los nombres de las variables necesarias pero sin sus valores."
+Seed data should match mock product data for a coherent demo.
 
 ### Actual
-No `.env.example` file exists.
+- `prisma/seed.ts` Trek Marlin: `price: 450000` (ARS 4,500 in centavos = ARS 45.00 if 100-based, or ARS 4,500 if already centavos)
+- `src/lib/seller-api.ts` MOCK_PRODUCTS Trek Marlin: `price_cents: 130000000` (ARS 1,300,000)
+
+These are wildly different values for the same product by the same ID (`prd_mock_001`).
 
 ### Files Involved
-- `.env.example` — does not exist
+- `prisma/seed.ts` (line 12-17)
+- `src/lib/seller-api.ts` (line 79-92)
 
 ### Impact
-Anyone cloning the repo (including the evaluator) has no documented list of required environment variables.
+Order history (seeded at ARS 4,500) will look inconsistent compared to the shop (showing ARS 1,300,000). A professor examining orders vs shop prices will see a mismatch.
 
 ### Is the deviation justified?
-**NO** — this is an explicit delivery requirement
+**NO.** Simple oversight.
 
 ### Required Action
-Create `.env.example` with all required variable names (no values).
-
----
-
-## DEV-10 — README Missing Deploy URL and Credentials
-
-### Expected
-Assignment: "README breve y conciso, debe incluir: descripción de la app, link al deploy, y credenciales o instrucciones para acceder con cada tipo de usuario."
-
-### Actual
-README has description and tech stack but no deploy URL and no user credentials.
-
-### Files Involved
-- `README.md`
-
-### Impact
-Evaluators cannot access the deployed app or log in without hunting for credentials.
-
-### Is the deviation justified?
-**NO** — explicit rubric requirement
-
-### Required Action
-Add deploy URL and user credentials to README.
-
----
-
-## DEV-11 — Products Proxy Ignores Filter Parameters
-
-### Expected
-The shop should send filter params (`q`, `category`, etc.) to Seller App for server-side filtering.
-
-### Actual
-`src/app/api/products/route.ts`:
-```typescript
-export async function GET() {
-  const { data } = await getSellerProducts({ status: "active" });
-  // No query params from the request are forwarded
-  return NextResponse.json(data.map(toProduct));
-}
-```
-And `src/lib/seller-api.ts:getSellerProducts()` accepts params but is called with no user params.
-
-### Files Involved
-- `src/app/api/products/route.ts`
-- `src/lib/seller-api.ts`
-
-### Impact
-All filtering is done client-side on the full product list. With real Seller App data (potentially thousands of products), this would load everything and then filter in the browser — performance issue and UX problem.
-
-### Is the deviation justified?
-**PARTIALLY** — client-side filtering works for the mock 12 products. But with real data it would fail.
-
-### Required Action
-Pass search params from the request to `getSellerProducts()`.
-
----
-
-## Summary
-
-| # | Deviation | Severity | Justified |
-|---|---|---|---|
-| DEV-01 | Payment session hardcoded mock | CRITICAL | NO |
-| DEV-02 | No Clerk middleware | CRITICAL | NO |
-| DEV-03 | Price in pesos vs centavos | HIGH | NO |
-| DEV-04 | No pagination on list APIs | HIGH | NO |
-| DEV-05 | Weight snapshot always 0 | HIGH | PARTIALLY |
-| DEV-06 | ID format without prefix | LOW | PARTIALLY |
-| DEV-07 | Shipping cost per group always 0 | MEDIUM | NO |
-| DEV-08 | Admin layout missing navigation | MEDIUM | NO |
-| DEV-09 | Missing `.env.example` | HIGH | NO |
-| DEV-10 | README missing URL and credentials | HIGH | NO |
-| DEV-11 | Products proxy ignores filter params | MEDIUM | PARTIALLY |
+Align seed prices with mock product prices. Use `price_cents: 130000000` in seed for Trek Marlin.
