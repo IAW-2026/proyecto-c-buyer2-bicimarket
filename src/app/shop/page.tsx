@@ -29,9 +29,9 @@ function ShopContent() {
       productId: product.id,
       sellerProfileId: product.sellerId ?? "unknown",
       productNameSnapshot: product.title,
-      unitPriceCents: Math.round((product.price ?? 0) * 100),
+      unitPriceCents: product.priceCents ?? 0,
       quantity: 1,
-      weightGramsSnapshot: 0,
+      weightGramsSnapshot: product.weightGrams ?? 0,
     });
   }
 

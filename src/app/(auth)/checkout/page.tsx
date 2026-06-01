@@ -69,7 +69,7 @@ export default function CheckoutPage() {
   const n = sellerGroups.length;
   const grossCents = 1_000_000 + 400_000 * n;
   const discountPct = Math.min(0.05 * (n - 1), 0.2);
-  const totalShipping = Math.round(grossCents * (1 - discountPct)) / 100;
+  const totalShipping = Math.round(grossCents * (1 - discountPct));
   const selectedAddress = addresses?.find((a) => a.id === form.watch("shippingAddressId"));
 
   return (
@@ -140,7 +140,7 @@ export default function CheckoutPage() {
               <div className="space-y-1.5 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal productos</span>
-                  <PriceDisplay amount={cart.totalCents / 100} />
+                  <PriceDisplay amount={cart.totalCents} />
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Total de envíos</span>
@@ -152,7 +152,7 @@ export default function CheckoutPage() {
                 <div className="flex justify-between">
                   <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total</span>
                   <PriceDisplay
-                    amount={cart.totalCents / 100 + totalShipping}
+                    amount={cart.totalCents + totalShipping}
                     className="text-2xl font-bold"
                   />
                 </div>

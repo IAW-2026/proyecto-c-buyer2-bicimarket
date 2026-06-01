@@ -14,12 +14,13 @@ export type SellerProduct = {
   id: string;
   title: string;
   description: string;
-  price: number;
+  price_cents: number;
   weight_grams: number;
   seller_profile_id: string;
   seller_name: string;
-  image_url: string | null;
+  main_image_url: string | null;
   status: "active" | "draft" | "inactive";
+  category: "mtb" | "road" | "urban" | "kids" | "bmx" | "parts" | "accessories" | "indumentaria";
   created_at: string;
   updated_at: string;
 };
@@ -36,7 +37,7 @@ export type SellerProductsParams = {
 export type ProductAvailability = {
   product_id: string;
   status: "active";
-  price: number;
+  price_cents: number;
   weight_grams: number;
   seller_profile_id: string;
   seller_name: string;
@@ -74,21 +75,6 @@ export type ShippingQuoteRequest = {
   service_level: ServiceLevel;
 };
 
-// Cotización individual por vendedor dentro de la respuesta
-export type ShippingQuoteItem = {
-  id: string;
-  seller_profile_id: string;
-  service_level: ServiceLevel;
-  carrier: string;
-  cost_cents: number;
-  currency: string;
-  estimated_days_min: number;
-  estimated_days_max: number;
-  weight_grams_total: number;
-  packages_count: number;
-  expires_at: string;
-};
-
 // POST /api/v1/shipping-quotes — response
 export type ShippingQuoteResponse = {
   origins_count: number;
@@ -96,7 +82,6 @@ export type ShippingQuoteResponse = {
   total_gross_cents: number;
   total_net_cents: number;    // lo que se cobra al comprador
   currency: string;
-  quotes: ShippingQuoteItem[];
 };
 
 // GET /api/v1/quote-preview — response (sin persistencia, para preview en carrito)

@@ -10,7 +10,7 @@ const formatter = new Intl.NumberFormat("es-AR", {
 });
 
 export function formatPrice(amount: number): string {
-  return formatter.format(amount);
+  return formatter.format(amount / 100);
 }
 
 export function PriceDisplay({ amount, className }: PriceDisplayProps) {

@@ -62,7 +62,7 @@ export default function OrderDetailPage({ params }: Props) {
       {/* Status stepper */}
       <div className="mb-6 rounded-xl border border-border/60 bg-card p-5">
         <p className="mb-4 text-xs font-medium text-muted-foreground">Estado del envío</p>
-        <OrderStatusStepper status={order.status} />
+        <OrderStatusStepper status={order.status} sellerGroups={order.sellerGroups} />
       </div>
 
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
@@ -86,16 +86,16 @@ export default function OrderDetailPage({ params }: Props) {
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Subtotal items</span>
-                <PriceDisplay amount={order.itemsTotalCents / 100} />
+                <PriceDisplay amount={order.itemsTotalCents} />
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total envíos</span>
-                <PriceDisplay amount={order.shippingTotalCents / 100} />
+                <PriceDisplay amount={order.shippingTotalCents} />
               </div>
             </div>
             <div className="border-t border-border/60 pt-2 flex justify-between font-semibold">
               <span>TOTAL</span>
-              <PriceDisplay amount={order.totalCents / 100} />
+              <PriceDisplay amount={order.totalCents} />
             </div>
           </div>
 

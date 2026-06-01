@@ -6,7 +6,7 @@
 
 ## 1. Qué es BiciMarket
 
-BiciMarket es un marketplace de bicicletas y repuestos que conecta **vendedores particulares y comerciales** con **compradores finales**. Cada operación atraviesa cuatro dominios independientes —compra, venta, envío y pago— y cada uno corre como una webapp aislada con su propia base de datos, su propio Clerk y su propia API. Las apps se comunican entre sí **siempre por REST sobre HTTP**: las consultas usan `GET`, las notificaciones de cambio de estado usan `POST` o `PATCH` server-to-server. Toda llamada inter-app va autenticada con un header `X-Service-Token` compartido entre el par origen↔destino.
+BiciMarket es un marketplace de bicicletas y repuestos que conecta **vendedores particulares y comerciales** con **compradores finales**. Cada operación atraviesa cuatro dominios independientes —compra, venta, envío y pago— y cada uno corre como una webapp aislada con su propia base de datos y su propia API; todas comparten un único proyecto de Clerk. Las apps se comunican entre sí **siempre por REST sobre HTTP**: las consultas usan `GET`, las notificaciones de cambio de estado usan `POST` o `PATCH` server-to-server. Toda llamada inter-app va autenticada con un header `X-Service-Token` compartido entre el par origen↔destino.
 
 El sistema se piensa para escalar a **órdenes multi-vendedor**: una compra puede contener productos de varios vendedores, y cada vendedor genera su propio paquete y su propia liquidación dentro de la misma orden del comprador.
 
@@ -31,19 +31,19 @@ El sistema se piensa para escalar a **órdenes multi-vendedor**: una compra pued
 | Shipping App | Logística, dueña de los `shipments`, paquetes y eventos de tracking                  | Enrique Seitz | Operadores logísticos, envíos, paquetes (con peso y dimensiones), cotizaciones, asignaciones, tracking |
 | Payments App | Pasarela y liquidaciones, integra Mercado Pago                                       | Rocco Paoloni | Pagos, intentos, comprobantes, liquidaciones por vendedor, transferencias                              |
 
-> **Importante**: cada app tiene **su propio proyecto en Clerk** (cuatro Clerks distintos). Los usuarios se autentican en la app que están usando; las apps se hablan entre sí por REST con `X-Service-Token`. No hay correlación de identidad entre Clerks. Ver `05-usuarios.md`.
+> **Importante**: todas las apps comparten **un único proyecto de Clerk** (el del Buyer App). Los usuarios tienen una sola cuenta de Clerk; su rol en cada app se determina por `publicMetadata`. Las apps se hablan entre sí por REST con `X-Service-Token`. Ver `05-usuarios.md`.
 
 ## 3. Actores
 
-| Actor              | Apps donde se loguea                                   | Clerk(s) que usa                                 |
-| ------------------ | ------------------------------------------------------ | ------------------------------------------------ |
-| Comprador          | Buyer App                                              | Clerk-Buyer (rol `buyer`)                        |
-| Vendedor           | Seller App                                             | Clerk-Seller (rol `seller`)                      |
-| Operador logístico | Shipping App                                           | Clerk-Shipping (rol `logistics`)                 |
-| Admin de Payments  | Payments App (admin UI: refunds, payouts, settlements) | Clerk-Payments (admin obligatorio)               |
-| Admin transversal  | Las apps donde necesite operar                         | Clerk respectivo con `publicMetadata.admin=true` |
+| Actor              | Apps donde se loguea                                   | Rol en Clerk                                      |
+| ------------------ | ------------------------------------------------------ | ------------------------------------------------- |
+| Comprador          | Buyer App                                              | `publicMetadata.role = "buyer"`                   |
+| Vendedor           | Seller App                                             | `publicMetadata.role = "seller"`                  |
+| Operador logístico | Shipping App                                           | `publicMetadata.role = "logistics"`               |
+| Admin de Payments  | Payments App (admin UI: refunds, payouts, settlements) | `publicMetadata.admin = true` (obligatorio)       |
+| Admin transversal  | Las apps donde necesite operar                         | `publicMetadata.admin = true`                     |
 
-Un humano que opera en varias apps tiene cuentas separadas en cada Clerk. El sistema **no las correlaciona**: si querés ver tus comprobantes vas a Buyer App; si querés ver tus liquidaciones vas a Seller App. Esas vistas las renderizan las apps fuente consumiendo Payments por REST.
+Un humano que opera en varias apps usa **la misma cuenta de Clerk**. Un usuario puede tener múltiples roles activos simultáneamente (ej.: comprador y vendedor). Si querés ver tus comprobantes vas a Buyer App; si querés ver tus liquidaciones vas a Seller App. Esas vistas las renderizan las apps fuente consumiendo Payments por REST.
 
 ## 4. Flujos principales
 
@@ -262,7 +262,7 @@ La única excepción —porque no podemos cambiarla— es el **webhook de Mercad
 | Shipping App | Logística, dueña de los `shipments`, paquetes y tracking         | Enrique Seitz   | Operadores logísticos, envíos, paquetes (peso y dimensiones), cotizaciones, asignaciones, tracking |
 | Payments App | Pasarela y liquidaciones, integra Mercado Pago                   | Rocco Paoloni   | Pagos, intentos, comprobantes, liquidaciones por vendedor, transferencias                          |
 
-> **Importante**: cada app tiene **su propio proyecto en Clerk** (cuatro Clerks distintos). Los usuarios se autentican en la app que están usando; las apps se hablan entre sí por REST con `X-Service-Token`. No hay correlación de identidad entre Clerks. Ver `05-usuarios.md`.
+> **Importante**: todas las apps comparten **un único proyecto de Clerk** (el del Buyer App). Los usuarios tienen una sola cuenta de Clerk; su rol en cada app se determina por `publicMetadata`. Las apps se hablan entre sí por REST con `X-Service-Token`. Ver `05-usuarios.md`.
 
 ## 6. Estados clave
 

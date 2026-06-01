@@ -33,7 +33,7 @@ export function OrderCard({ order }: OrderCardProps) {
             {date} · {order.items.length} producto{order.items.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <PriceDisplay amount={order.totalCents / 100} className="shrink-0 font-bold" />
+        <PriceDisplay amount={order.totalCents} className="shrink-0 font-bold" />
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-3">

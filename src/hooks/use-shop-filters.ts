@@ -15,7 +15,7 @@ export function useShopFilters(products: Product[] | undefined) {
   const onlyInStock = searchParams.get("stock") === "1";
   const selectedSellers = searchParams.get("sellers")?.split(",").filter(Boolean) ?? [];
   const minPrice = Number(searchParams.get("minPrice") ?? 0);
-  const maxPrice = Number(searchParams.get("maxPrice") ?? 10_000_000);
+  const maxPrice = Number(searchParams.get("maxPrice") ?? 1_000_000_000);
   const bikeType = searchParams.get("bikeType") ?? "";
 
   const filters = { searchQuery, category, onlyInStock, selectedSellers, minPrice, maxPrice, bikeType };
@@ -46,15 +46,15 @@ export function useShopFilters(products: Product[] | undefined) {
   }, [products]);
 
   const priceRange = useMemo(() => {
-    if (!products || products.length === 0) return { min: 0, max: 10_000_000 };
-    const prices = products.map((p) => p.price ?? 0);
+    if (!products || products.length === 0) return { min: 0, max: 1_000_000_000 };
+    const prices = products.map((p) => p.priceCents ?? 0);
     return { min: Math.min(...prices), max: Math.max(...prices) };
   }, [products]);
 
   const filtered = useMemo(() => {
     if (!products) return [];
     return products.filter((p) => {
-      const price = p.price ?? 0;
+      const price = p.priceCents ?? 0;
       if (price < minPrice || price > maxPrice) return false;
       if (onlyInStock && !p.isActive) return false;
       if (selectedSellers.length > 0 && !selectedSellers.includes(p.sellerId ?? "unknown"))

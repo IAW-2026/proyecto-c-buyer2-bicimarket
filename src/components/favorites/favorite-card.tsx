@@ -2,6 +2,7 @@
 
 import { Heart, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PriceDisplay } from "@/components/shared/price-display";
 import type { FavoriteItem, Product } from "@/types/buyer";
 
 type FavoriteCardProps = {
@@ -35,9 +36,9 @@ export function FavoriteCard({
             {product.description}
           </p>
         )}
-        {product?.price != null && (
+        {product?.priceCents != null && (
           <p className="text-sm font-semibold mt-2">
-            {new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(product.price)}
+            <PriceDisplay amount={product.priceCents} />
           </p>
         )}
         <p className="text-xs text-muted-foreground mt-1">

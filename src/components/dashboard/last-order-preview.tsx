@@ -42,7 +42,7 @@ export function LastOrderPreview() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <PriceDisplay amount={lastOrder.totalCents / 100} className="font-semibold" />
+          <PriceDisplay amount={lastOrder.totalCents} className="font-semibold" />
           <Link href={`/orders/${lastOrder.id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
             Ver detalle
           </Link>

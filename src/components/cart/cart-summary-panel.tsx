@@ -16,7 +16,7 @@ export function CartSummaryPanel({ cart }: CartSummaryPanelProps) {
         <span className="text-muted-foreground">
           Subtotal ({cart.itemCount} {cart.itemCount === 1 ? "item" : "items"})
         </span>
-        <PriceDisplay amount={cart.totalCents / 100} />
+        <PriceDisplay amount={cart.totalCents} />
       </div>
 
       <div className="flex items-center justify-between text-sm">
@@ -27,7 +27,7 @@ export function CartSummaryPanel({ cart }: CartSummaryPanelProps) {
       <div className="border-t border-border/60 pt-3">
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-muted-foreground">Total estimado</span>
-          <PriceDisplay amount={cart.totalCents / 100} className="text-xl font-bold" />
+          <PriceDisplay amount={cart.totalCents} className="text-xl font-bold" />
         </div>
       </div>
 

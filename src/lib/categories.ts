@@ -18,7 +18,7 @@ export const CATEGORIES: CategoryDef[] = [
   {
     id: "accesorios",
     label: "Accesorios",
-    keywords: ["casco", "candado", "luz", "bolso", "cubierta", "cámara", "rodado"],
+    keywords: ["casco", "candado", "luz", "bolso", "cubierta", "cámara"],
   },
   {
     id: "indumentaria",
@@ -60,9 +60,10 @@ export function matchesBikeType(
 }
 
 export function matchesCategory(
-  product: { title: string; description?: string | null },
+  product: { title: string; description?: string | null; category?: string | null },
   categoryId: string,
 ): boolean {
+  if (product.category) return product.category === categoryId;
   const cat = CATEGORIES.find((c) => c.id === categoryId);
   if (!cat) return true;
   const text = `${product.title} ${product.description ?? ""}`.toLowerCase();

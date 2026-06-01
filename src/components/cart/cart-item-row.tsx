@@ -28,7 +28,7 @@ export function CartItemRow({
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold leading-tight">{item.productNameSnapshot}</p>
         <p className="text-xs text-muted-foreground">
-          <PriceDisplay amount={item.unitPriceCents / 100} /> c/u
+          <PriceDisplay amount={item.unitPriceCents} /> c/u
         </p>
       </div>
 
@@ -54,7 +54,7 @@ export function CartItemRow({
         </Button>
       </div>
 
-      <PriceDisplay amount={(item.unitPriceCents * item.quantity) / 100} className="w-24 text-right text-sm font-semibold" />
+      <PriceDisplay amount={item.unitPriceCents * item.quantity} className="w-24 text-right text-sm font-semibold" />
 
       <Button
         variant="ghost"

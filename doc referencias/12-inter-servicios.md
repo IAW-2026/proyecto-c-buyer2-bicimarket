@@ -42,7 +42,7 @@ Header: X-Request-Id: uuid-para-tracing
 
 El token es un string secreto compartido entre el par de apps. Está en variables de entorno, nunca en el código.
 
-**¿Por qué no reusar el JWT de Clerk?** Porque cada app tiene su propio Clerk independiente. Un JWT de Buyer App no es válido en Shipping App.
+**¿Por qué no reusar el JWT de Clerk?** Porque las llamadas inter-servicio son de servidor a servidor, sin usuario activo. Usar X-Service-Token provee una identidad de servicio clara, independiente de la sesión del usuario.
 
 ---
 

@@ -20,7 +20,7 @@ import {
   CheckCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { OrderStatus } from "@/types/buyer";
+import { OrderStatus, SellerGroupStatus, type OrderSellerGroup } from "@/types/buyer";
 
 type NodeState = "completed" | "current" | "upcoming" | "error";
 
@@ -40,7 +40,7 @@ const STEP_DEFS = [
 
 const STATUS_STEP: Partial<Record<OrderStatus, number>> = {
   [OrderStatus.PENDING_PAYMENT]: 0,
-  [OrderStatus.PAID]: 1,
+  [OrderStatus.PAID]: 2,
   [OrderStatus.PARTIALLY_SHIPPED]: 3,
   [OrderStatus.SHIPPED]: 3,
   [OrderStatus.DELIVERED]: 4,
@@ -120,10 +120,21 @@ const nodeTypes: NodeTypes = { status: StatusNode };
 
 const X_STEP = 165;
 
-export function OrderStatusFlow({ status }: { status: OrderStatus }) {
-  const currentStep = CANCELLED_SET.has(status)
-    ? -1
-    : (STATUS_STEP[status] ?? 0);
+const PREPARING_SET = new Set<SellerGroupStatus>([
+  SellerGroupStatus.PREPARING,
+  SellerGroupStatus.READY_TO_SHIP,
+]);
+
+export function OrderStatusFlow({
+  status,
+  sellerGroups,
+}: {
+  status: OrderStatus;
+  sellerGroups?: OrderSellerGroup[];
+}) {
+  const baseStep = CANCELLED_SET.has(status) ? -1 : (STATUS_STEP[status] ?? 0);
+  const anyPreparing = sellerGroups?.some((g) => PREPARING_SET.has(g.status)) ?? false;
+  const currentStep = baseStep === 2 && anyPreparing ? 3 : baseStep;
   const isCancelled = currentStep === -1;
   const isFinished = status === OrderStatus.DELIVERED || status === OrderStatus.COMPLETED;
 

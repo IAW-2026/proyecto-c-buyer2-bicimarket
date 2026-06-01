@@ -1,6 +1,7 @@
 import type { Order } from "@/types/buyer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PriceDisplay } from "@/components/shared/price-display";
 
 type OrderSummaryProps = {
   order: Order;
@@ -21,8 +22,8 @@ export function OrderSummary({ order }: OrderSummaryProps) {
       <CardContent className="space-y-3">
         <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
           <div>Total de artículos: {order.items.length}</div>
-          <div>Envío: ${(order.shippingTotalCents / 100).toFixed(2)}</div>
-          <div>Monto total: ${(order.totalCents / 100).toFixed(2)}</div>
+          <div>Envío: <PriceDisplay amount={order.shippingTotalCents} /></div>
+          <div>Monto total: <PriceDisplay amount={order.totalCents} /></div>
           <div>Pago: {order.paymentId ?? "Pendiente"}</div>
         </div>
       </CardContent>

@@ -114,7 +114,7 @@ export function ProductCard({
         <p className="line-clamp-2 flex-1 text-sm font-semibold leading-snug">{product.title}</p>
 
         <div className="flex items-center justify-between gap-2">
-          <PriceDisplay amount={product.price ?? 0} className="text-sm font-bold" />
+          <PriceDisplay amount={product.priceCents ?? 0} className="text-sm font-bold" />
 
           {!product.isActive ? null : isInCart ? (
             <div className="flex items-center gap-1">

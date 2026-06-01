@@ -1,26 +1,24 @@
 [![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/Tl5PKMoG)
-# buyer
-
-Aplicación **Buyer** del [Proyecto IAW 2026](https://iaw-2026.github.io/proyecto/) — comisión `BiciMarket`.
-
-Esta app corresponde al rol del comprador en los proyectos de tipo **C (Marketplace)**.
-
----
-
-Enunciado completo: <https://iaw-2026.github.io/proyecto/>
 
 # BiciMarket — Buyer App
 
-App del comprador del marketplace BiciMarket. Permite a los usuarios navegar el catálogo, gestionar su carrito, hacer checkout y ver el historial de pedidos.
+Aplicación del **comprador** del marketplace BiciMarket. Permite navegar el catálogo, gestionar el carrito, hacer checkout y ver el historial de pedidos.
 
-Esta app es una de cuatro apps independientes del sistema. Cada app tiene su propia base de datos y su propio Clerk.
+---
 
-| App | Responsable | Puerto dev |
-|-----|-------------|------------|
-| **Buyer App** (este repo) | Camila Rojas | 3000 |
-| Seller App | Pierino Spina | 3001 |
-| Shipping App | Enrique Seitz | 3002 |
-| Payments App | Rocco Paoloni | 3003 |
+## 🚀 Deploy
+
+- **URL**: https://proyecto-c-buyer2-bicimarket.vercel.app/
+- **Admin**: email `admin@test.com` | contraseña `Admin1234!`
+- **Comprador**: email `comprador@test.com` | contraseña `Comprador1234!`
+
+> Para crear un admin nuevo: registrarse normalmente → ir al Clerk Dashboard → buscar el usuario → editar `publicMetadata` → agregar `{ "admin": true }`.
+
+---
+
+## Stack
+
+Next.js 16 · PostgreSQL · Prisma · Clerk · Tailwind CSS · shadcn/ui · Zustand · TanStack Query
 
 ---
 
@@ -31,20 +29,35 @@ Esta app es una de cuatro apps independientes del sistema. Cada app tiene su pro
 npm install
 
 # 2. Configurar variables de entorno
-# Copiar los valores del grupo y pegarlos en .env.local
-cp .env .env.local
+cp .env .env.local   # Completar con los valores del grupo
 
-# 3. Generar el cliente de Prisma
+# 3. Generar el cliente de Prisma y crear las tablas
 npx prisma generate
-
-# 4. Crear las tablas en la base de datos
 npx prisma db push
+
+# 4. Poblar la base de datos con datos de prueba
+npm run seed
 
 # 5. Iniciar el servidor de desarrollo
 npm run dev
 ```
 
 > **Nota:** cada vez que cambiás `prisma/schema.prisma` tenés que correr `npx prisma generate` y luego `npx prisma db push`.
+
+---
+
+## Arquitectura
+
+Esta app es una de cuatro apps independientes del sistema. Cada app tiene su propia base de datos; todas comparten el mismo proyecto de Clerk.
+
+| App | Responsable | 
+|-----|-------------|
+| **Buyer App** | **Camila Rojas** | 
+| Seller App | Pierino Spina | 
+| Shipping App | Enrique Seitz | 
+| Payments App | Rocco Paoloni | 
+
+Ver `documentacion/` para la arquitectura completa del sistema.
 
 ---
 
@@ -55,6 +68,7 @@ src/
 ├── app/                        # App Router — páginas y rutas API
 │   ├── layout.tsx              # Layout raíz (Clerk + QueryProvider)
 │   ├── page.tsx                # Home
+│   ├── admin/                  # Panel de administración (protegido)
 │   ├── dashboard/              # Dashboard del comprador (protegido)
 │   ├── shop/                   # Catálogo de productos
 │   ├── cart/                   # Carrito de compras
@@ -105,6 +119,7 @@ src/
 
 prisma/
 ├── schema.prisma               # Modelos de base de datos
+├── seed.ts                     # Script de datos de prueba
 └── migrations/                 # Historial de migraciones
 
 referencias/                    # Documentación para beginners (14 archivos)
@@ -118,12 +133,13 @@ documentacion/                  # Documentación general del sistema (compartida
 | Ruta | Descripción |
 |------|-------------|
 | `/` | Home público |
-| `/dashboard` | Dashboard del comprador (requiere login) |
 | `/shop` | Catálogo de productos |
+| `/dashboard` | Dashboard del comprador (requiere login) |
 | `/cart` | Carrito de compras |
 | `/checkout` | Proceso de pago |
 | `/orders` | Historial de pedidos |
 | `/profile` | Perfil y direcciones de envío |
+| `/admin` | Panel de administración (requiere `publicMetadata.admin = true`) |
 
 ---
 
@@ -159,21 +175,6 @@ documentacion/                  # Documentación general del sistema (compartida
 
 ---
 
-## Stack tecnológico
-
-| Tecnología | Uso |
-|-----------|-----|
-| Next.js 16 (App Router) | Framework principal |
-| TypeScript | Tipado estático |
-| Tailwind CSS + shadcn/ui | Estilos y componentes |
-| Clerk | Autenticación |
-| PostgreSQL + Prisma | Base de datos y ORM |
-| Zustand | Estado de UI |
-| TanStack Query + Axios | Data fetching y cache |
-| React Hook Form + Zod | Formularios y validación |
-
----
-
 ## Comandos útiles
 
 ```bash
@@ -182,6 +183,9 @@ npm run dev
 
 # Build de producción
 npm run build
+
+# Seed
+npm run seed
 
 # Prisma
 npx prisma generate        # Regenera el cliente (necesario después de cambiar schema.prisma)
@@ -217,4 +221,3 @@ La carpeta `referencias/` tiene documentación paso a paso pensada para principi
 | `14-agregar-funcionalidad.md` | Tutorial: agregar una nueva funcionalidad end-to-end |
 
 La documentación general del sistema (arquitectura, contratos de API, modelos compartidos) está en `documentacion/`.
-

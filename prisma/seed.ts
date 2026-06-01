@@ -20,7 +20,7 @@ const MOCK_PRODUCTS = [
   {
     id: "prd_mock_002",
     name: "Bicicleta urbana Totem City",
-    price: 180000,
+    price: 18000000,
     weightGrams: 11000,
     sellerId: "sel_mock_002",
     sellerName: "Urban Bike Store",
@@ -28,7 +28,7 @@ const MOCK_PRODUCTS = [
   {
     id: "prd_mock_003",
     name: "Casco ciclismo Giro Register",
-    price: 35000,
+    price: 55000,
     weightGrams: 320,
     sellerId: "sel_mock_001",
     sellerName: "BiciShop Buenos Aires",

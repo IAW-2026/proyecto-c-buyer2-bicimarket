@@ -11,7 +11,7 @@ These issues directly cost points or prevent the app from functioning.
 
 ---
 
-## FIX-01 — Create `middleware.ts` for Clerk
+## FIX-01 — Create `middleware.ts` for Clerk (YA ESTA)
 
 **Severity**: CRITICAL
 **Affected files**: Project root (create new file)
@@ -46,7 +46,7 @@ export const config = {
 
 ---
 
-## FIX-02 — Add Deploy URL and Credentials to README
+## FIX-02 — Add Deploy URL and Credentials to README (PREGUNTAR ADMIN)
 
 **Severity**: CRITICAL
 **Affected files**: `README.md`
@@ -65,7 +65,7 @@ Add this section at the TOP of README.md (before anything else):
 
 ---
 
-## FIX-03 — Create `.env.example`
+## FIX-03 — Create `.env.example` (YA ESTA)
 
 **Severity**: CRITICAL
 **Affected files**: `.env.example` (create new file), `.gitignore` (add exception)
@@ -100,7 +100,7 @@ Add to `.gitignore` (so the example CAN be committed):
 
 ---
 
-## FIX-04 — Fix Payment Session to Call Payments API
+## FIX-04 — Fix Payment Session to Call Payments API (INTEGRACION)
 
 **Severity**: CRITICAL
 **Affected files**: `src/lib/buyer-service.ts`, `src/app/api/v1/buyer/checkout/route.ts`
@@ -146,7 +146,7 @@ The `createPayment()` in `lib/payments-api.ts` already has a mock fallback when 
 
 ---
 
-## FIX-05 — Add Admin Sidebar to Admin Layout
+## FIX-05 — Add Admin Sidebar to Admin Layout (LISTO)
 
 **Severity**: HIGH
 **Affected files**: `src/app/admin/layout.tsx`
@@ -182,7 +182,7 @@ Check `AdminSidebar` and `AdminHeader` components first to ensure they don't hav
 
 ---
 
-## FIX-06 — Deploy the App to Vercel
+## FIX-06 — Deploy the App to Vercel (YA ESTA)
 
 **Severity**: CRITICAL
 **Affected files**: Vercel dashboard
@@ -200,7 +200,7 @@ Steps:
 
 ---
 
-## FIX-07 — Add Seed Script to package.json
+## FIX-07 — Add Seed Script to package.json (LISTO)
 
 **Severity**: HIGH
 **Affected files**: `package.json`
@@ -231,7 +231,7 @@ Important for the defense but not blocking for delivery.
 
 ---
 
-## FIX-08 — Add Pagination to List APIs
+## FIX-08 — Add Pagination to List APIs (LISTO)
 
 **Severity**: HIGH
 **Affected files**: All `route.ts` in `/api/v1/buyer/orders/`, `/api/admin/orders/`, `/api/admin/buyers/`, `/api/admin/carts/`
@@ -299,7 +299,7 @@ function toProduct(p: SellerProduct): Product {
 
 ---
 
-## FIX-10 — Fix Shipping Cost Per Seller Group
+## FIX-10 — Fix Shipping Cost Per Seller Group (LISTO)
 
 **Severity**: MEDIUM
 **Affected files**: `src/app/api/v1/buyer/checkout/route.ts:118`
@@ -319,7 +319,7 @@ shippingCostCents: quoteResponse.quotes.find(
 
 ---
 
-## FIX-11 — Standardize Error Response Format
+## FIX-11 — Standardize Error Response Format (LISTO)
 
 **Severity**: MEDIUM
 **Affected files**: `src/app/api/v1/buyer/checkout/route.ts` and others with inconsistent format
@@ -340,7 +340,7 @@ return NextResponse.json(
 
 ---
 
-## FIX-12 — Fix Price Units (Pesos vs Centavos)
+## FIX-12 — Fix Price Units (Pesos vs Centavos) ()
 
 **Severity**: HIGH (for real integration, deferred for now)
 **Affected files**: `src/lib/seller-api.ts`, `src/types/inter-service.ts`, `src/app/shop/page.tsx`

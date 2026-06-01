@@ -6,12 +6,14 @@
 
 ## 1. Distribución
 
-| App          | Responsable        | Repositorio                                                         | Clerk propio                                                            |
-| ------------ | ------------------ | ------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Buyer App    | Camila Rojas Fritz | https://github.com/camilarojasfritz/proyecto-c-buyer-camilarojas    | Sí (`buyer.bicimarket`)                                                 |
-| Seller App   | Pierino Spina      | https://github.com/Spinapierino7/proyecto-c-seller-pierinospina.git | Sí (`seller.bicimarket`)                                                |
-| Shipping App | Enrique Seitz      | https://github.com/Enry6tz/proyecto-c-shipping-enriqueseitz         | Sí (`shipping.bicimarket`)                                              |
-| Payments App | Rocco Paoloni      | https://github.com/roccopaoloni/proyecto-c-payments-roccopaoloni    | Sí (`payments.bicimarket`), **solo para admins** (no buyers ni sellers) |
+| App          | Responsable        | Repositorio                                                         |
+| ------------ | ------------------ | ------------------------------------------------------------------- |
+| Buyer App    | Camila Rojas Fritz | https://github.com/camilarojasfritz/proyecto-c-buyer-camilarojas    |
+| Seller App   | Pierino Spina      | https://github.com/Spinapierino7/proyecto-c-seller-pierinospina.git |
+| Shipping App | Enrique Seitz      | https://github.com/Enry6tz/proyecto-c-shipping-enriqueseitz         |
+| Payments App | Rocco Paoloni      | https://github.com/roccopaoloni/proyecto-c-payments-roccopaoloni    |
+
+> Todas las apps comparten el mismo proyecto de Clerk (el del Buyer App). Las claves `CLERK_PUBLISHABLE_KEY` y `CLERK_SECRET_KEY` son idénticas en los cuatro repos.
 
 ---
 
@@ -23,7 +25,7 @@ Toda app del sistema cumple estas reglas. **Si alguna no las cumple, el sistema 
 
 1. **Versionado**: todos los endpoints viven bajo `/api/v1/...`.
 2. **Autenticación**:
-   - `Authorization: Bearer <JWT>` para llamadas hechas por la UI propia, validadas contra el Clerk de **esa misma app**.
+   - `Authorization: Bearer <JWT>` para llamadas hechas por la UI propia, validadas contra el Clerk compartido.
    - `X-Service-Token: <secret>` para llamadas server-to-server entre apps. Cada par origen→destino tiene su propio secret rotable.
 3. **Formato de error**: `{ "error": { "code": "...", "message": "...", "details": {} } }` con HTTP status apropiado. Códigos en `SCREAMING_SNAKE_CASE`.
 4. **Paginación**: GET de listado devuelve `{ "data": [...], "pagination": { "total": N, "page": 1, "limit": 20, "has_more": true } }`. Default `limit=20`, máximo `limit=100`.
@@ -229,7 +231,7 @@ La Payments App **se compromete a**:
 
 | Tipo                                            | Cuándo                                                     | Headers obligatorios                                | Auth                                        | Retry                                                |
 | ----------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------- | ---------------------------------------------------- |
-| **REST usuario → app propia**                   | UI llama a su backend                                      | `Authorization: Bearer <JWT>`                       | JWT validado contra Clerk de la misma app   | No (lo maneja el cliente)                            |
+| **REST usuario → app propia**                   | UI llama a su backend                                      | `Authorization: Bearer <JWT>`                       | JWT validado contra el Clerk compartido     | No (lo maneja el cliente)                            |
 | **REST app → app** (consultas Y notificaciones) | Cualquier comunicación interna entre apps                  | `X-Service-Token: <secret>`, `X-Request-Id: <uuid>` | Secret compartido del par origen→destino    | 3 reintentos con timeout 5s, backoff lineal 1s/3s/9s |
 | **Webhook MP → Payments**                       | Cambio de pago en Mercado Pago (único webhook del sistema) | Firma propia de MP (`x-signature`)                  | Validar contra `MERCADOPAGO_WEBHOOK_SECRET` | Lo maneja Mercado Pago                               |
 

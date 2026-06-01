@@ -68,9 +68,9 @@ export default function ProductDetailPage({ params }: Props) {
       productId: product!.id,
       sellerProfileId: product!.sellerId ?? "unknown",
       productNameSnapshot: product!.title,
-      unitPriceCents: Math.round((product!.price ?? 0) * 100),
+      unitPriceCents: product!.priceCents ?? 0,
       quantity: 1,
-      weightGramsSnapshot: 0,
+      weightGramsSnapshot: product!.weightGrams ?? 0,
     });
   }
 
@@ -144,7 +144,7 @@ export default function ProductDetailPage({ params }: Props) {
             )}
           </div>
 
-          <PriceDisplay amount={product.price ?? 0} className="font-heading text-4xl font-bold" />
+          <PriceDisplay amount={product.priceCents ?? 0} className="font-heading text-4xl font-bold" />
 
           {product.description && (
             <p className="text-sm leading-relaxed text-muted-foreground">{product.description}</p>

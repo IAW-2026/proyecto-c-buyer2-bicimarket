@@ -104,7 +104,6 @@ export async function POST(request: NextRequest) {
   });
 
   const shippingTotalCents = quoteResponse.total_net_cents;
-  const quoteMap = new Map(quoteResponse.quotes.map((q) => [q.seller_profile_id, q.id]));
 
   const itemsTotalCents = groupedData.reduce((s, g) => s + g.itemsSubtotalCents, 0);
   const totalCents = itemsTotalCents + shippingTotalCents;
@@ -131,7 +130,6 @@ export async function POST(request: NextRequest) {
           itemsSubtotalCents: g.itemsSubtotalCents,
           shippingCostCents: 0,
           weightGramsTotal: g.weightGramsTotal,
-          shippingQuoteId: quoteMap.get(g.sellerProfileId) ?? null,
           status: "PENDING",
         },
       }),

@@ -2,10 +2,12 @@ export type Product = {
   id: string;
   title: string;
   description: string;
-  price: number;
+  priceCents: number;
+  weightGrams: number;
   imageUrl?: string | null;
   sellerId?: string | null;
   sellerName?: string | null;
+  category?: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

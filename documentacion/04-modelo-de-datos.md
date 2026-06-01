@@ -16,7 +16,7 @@
 - **Snapshots**: cuando un campo viene de otra app (precio, dirección, nombre del producto), se guarda con sufijo `_snapshot` y **nunca se actualiza** una vez guardado.
 - **Referencias cruzadas**: los IDs de otras apps se guardan como **string opaco**, sin foreign key. La integridad la mantiene el ciclo de vida del negocio.
 - **Auditoría**: cualquier cambio de estado relevante (`order.status`, `shipment.status`, `payment.status`, `settlement.status`) deja registro en una tabla `*_status_history` (ver §6).
-- **Identidad**: cada app tiene su propio Clerk. `clerk_user_id` en cada perfil refiere al Clerk **de esa app**. No existe correlación entre Clerks: si un humano opera en varias apps, sus cuentas son independientes. Las apps no mantienen tablas de mapeo entre identidades.
+- **Identidad**: todas las apps comparten el mismo proyecto de Clerk. El `clerk_user_id` es el mismo para un usuario dado sin importar en qué app lo lea. Un humano puede tener roles en múltiples apps (comprador y vendedor, por ejemplo) usando la misma cuenta de Clerk; el rol se determina por `publicMetadata`.
 
 ---
 
@@ -556,8 +556,8 @@ pending ─► paid (terminal)
 
 | Dato | Apps que lo tienen | Fuente de verdad | Estrategia |
 |---|---|---|---|
-| Identidad de usuario | Cada app tiene su Clerk | El Clerk de cada app | Cada Clerk es una base de usuarios independiente. No hay sync ni mapeo entre Clerks: si un humano opera en varias apps, sus cuentas son cuentas separadas. El sistema no las correlaciona. |
-| Datos de perfil básicos (nombre, email) | Clerk de cada app + perfil local | Clerk de esa app | El perfil local se crea en el primer login (provisioning perezoso): el backend lee los claims del JWT y guarda el snapshot. Las actualizaciones siguen con cada login (refresh on demand). |
+| Identidad de usuario | Todas las apps comparten el mismo Clerk | El Clerk compartido | Un usuario tiene una sola cuenta de Clerk. Su rol en cada app se determina por `publicMetadata`. |
+| Datos de perfil básicos (nombre, email) | Clerk compartido + perfil local en cada DB | Clerk compartido | El perfil local se crea en el primer login en cada app (provisioning perezoso): el backend lee los claims del JWT y hace upsert. |
 | `order_id` y estado visible de la orden | Buyer (verdad), Seller, Shipping, Payments | **Buyer App** | Buyer es dueña; las demás guardan ref opaca y reciben `PATCH` REST cuando hay cambios. |
 | `shipment_id` y estado de envío | Shipping (verdad), Buyer, Seller | **Shipping App** | Shipping notifica con `PATCH` REST; Buyer y Seller guardan `shipping_status` espejo. |
 | `payment_id` y estado de pago | Payments (verdad), Buyer, Seller | **Payments App** | Payments notifica con `PATCH` REST. |

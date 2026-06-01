@@ -16,18 +16,18 @@ En este proyecto, Clerk está **integrado directamente en Next.js** a través de
 
 ---
 
-## Por qué el Buyer App tiene su propio Clerk
+## El Clerk compartido de BiciMarket
 
-El sistema BiciMarket tiene **4 apps independientes**, cada una con su propio Clerk. Un usuario del Buyer App (comprador) y un usuario del Seller App (vendedor) son cuentas completamente separadas.
+El sistema BiciMarket tiene **4 apps independientes** que comparten **un único proyecto de Clerk** (el del Buyer App). Un usuario tiene una sola cuenta y puede operar en múltiples apps con la misma sesión.
 
 ```
-Buyer App → Clerk-Buyer  (compradores)
-Seller App → Clerk-Seller (vendedores)
-Shipping App → Clerk-Shipping (operadores)
-Payments App → Clerk-Payments (admin)
+Buyer App    → Clerk compartido (rol: publicMetadata.role = "buyer")
+Seller App   → Clerk compartido (rol: publicMetadata.role = "seller")
+Shipping App → Clerk compartido (rol: publicMetadata.role = "logistics")
+Payments App → Clerk compartido (requiere publicMetadata.admin = true)
 ```
 
-Un JWT del Buyer App no es válido en el Seller App. Las apps se comunican entre sí usando X-Service-Token (ver [12-inter-servicios.md](12-inter-servicios.md)), no con JWT de usuarios.
+Las apps se comunican entre sí usando X-Service-Token (ver [12-inter-servicios.md](12-inter-servicios.md)), no con JWT de usuarios.
 
 ---
 

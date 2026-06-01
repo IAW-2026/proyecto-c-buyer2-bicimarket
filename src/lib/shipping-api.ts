@@ -73,29 +73,9 @@ export async function getShipmentsByOrder(orderId: string): Promise<Shipment[]> 
 // Mock — se usa cuando SHIPPING_APP_URL no está configurada
 // ----------------------------------------------------------------
 function buildMockResponse(req: ShippingQuoteRequest): ShippingQuoteResponse {
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
   const n = req.pickups.length;
   // $10,000 base + $4,000 por pickup, en centavos
   const grossCents = 1_000_000 + 400_000 * n;
-  const perPickupCents = Math.round(grossCents / n);
-
-  const quotes = req.pickups.map((pickup, i) => {
-    const totalWeight = pickup.packages.reduce((s, p) => s + p.weight_grams, 0);
-    return {
-      id: `qte_mock_${i}`,
-      seller_profile_id: pickup.seller_profile_id,
-      service_level: req.service_level,
-      carrier: "MockCarrier",
-      cost_cents: perPickupCents,
-      currency: "ARS",
-      estimated_days_min: 3,
-      estimated_days_max: 5,
-      weight_grams_total: totalWeight,
-      packages_count: pickup.packages.length,
-      expires_at: expiresAt,
-    };
-  });
-
   const discountPct = Math.min(0.05 * (n - 1), 0.2);
   const totalNetCents = Math.round(grossCents * (1 - discountPct));
 
@@ -105,6 +85,5 @@ function buildMockResponse(req: ShippingQuoteRequest): ShippingQuoteResponse {
     total_gross_cents: grossCents,
     total_net_cents: totalNetCents,
     currency: "ARS",
-    quotes,
   };
 }

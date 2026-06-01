@@ -29,10 +29,10 @@ export function SellerGroupPreview({ group }: SellerGroupPreviewProps) {
             <div className="flex-1 min-w-0">
               <p className="truncate text-sm">{item.productNameSnapshot}</p>
               <p className="text-xs text-muted-foreground">
-                {item.quantity} × <PriceDisplay amount={item.unitPriceCents / 100} />
+                {item.quantity} × <PriceDisplay amount={item.unitPriceCents} />
               </p>
             </div>
-            <PriceDisplay amount={(item.unitPriceCents * item.quantity) / 100} className="text-sm font-semibold" />
+            <PriceDisplay amount={item.unitPriceCents * item.quantity} className="text-sm font-semibold" />
           </div>
         ))}
       </div>
