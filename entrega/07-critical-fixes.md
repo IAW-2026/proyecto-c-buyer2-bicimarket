@@ -185,7 +185,7 @@ Then add pagination controls to `src/app/shop/page.tsx` that update `?page=N` in
 
 ---
 
-### FIX-10: Remove vim swap file from repository
+### FIX-10: Remove vim swap file from repository (LISTO)
 
 **Severity:** LOW  
 **Affected files:** `src/components/admin/.orders-table.tsx.swp`  

@@ -17,8 +17,9 @@ import type { Product } from "@/types/buyer";
 function ShopContent() {
   const searchParams = useSearchParams();
   const page = Math.max(1, Number(searchParams.get("page") ?? 1));
+  const category = searchParams.get("category") ?? "";
 
-  const { data: productsResult, isLoading } = useProducts(page);
+  const { data: productsResult, isLoading } = useProducts(page, category);
   const { data: favoritesResult } = useFavoriteItems();
   const favorites = favoritesResult?.data;
   const { data: cart } = useBuyerCart();
@@ -81,8 +82,18 @@ function ShopContent() {
           </h1>
           {!isLoading && pagination && (
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {pagination.total}{" "}
-              {pagination.total === 1 ? "producto" : "productos"}
+              {(() => {
+                const hasClientFilters = !!(
+                  shopFilters.filters.searchQuery ||
+                  shopFilters.filters.onlyInStock ||
+                  shopFilters.filters.selectedSellers.length > 0 ||
+                  shopFilters.filters.bikeType ||
+                  searchParams.get("minPrice") ||
+                  searchParams.get("maxPrice")
+                );
+                const count = hasClientFilters ? shopFilters.filtered.length : pagination.total;
+                return <>{count} {count === 1 ? "producto" : "productos"}</>;
+              })()}
               {activeSearch && (
                 <span> para &ldquo;{activeSearch}&rdquo;</span>
               )}

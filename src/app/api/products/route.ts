@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSellerProducts } from "@/lib/seller-api";
+import { matchesCategory } from "@/lib/categories";
 import type { Product } from "@/types/buyer";
 import type { SellerProduct } from "@/types/inter-service";
 
@@ -38,10 +39,16 @@ function toProduct(p: SellerProduct): Product {
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const page = Math.max(1, Number(url.searchParams.get("page") ?? 1));
+  const categoryParam = url.searchParams.get("category") ?? "";
   const limit = 20;
 
   const { data } = await getSellerProducts({ status: "active" });
-  const products = data.map(toProduct);
+  let products = data.map(toProduct);
+
+  if (categoryParam) {
+    products = products.filter((p) => matchesCategory(p, categoryParam));
+  }
+
   const total = products.length;
   const start = (page - 1) * limit;
   const paged = products.slice(start, start + limit);

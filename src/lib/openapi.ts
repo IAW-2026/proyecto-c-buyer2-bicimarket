@@ -11,8 +11,16 @@ const serviceToken: OpenAPIV3.SecuritySchemeObject = {
   type: "apiKey",
   in: "header",
   name: "X-Service-Token",
-  description: "Token de servicio para comunicación inter-apps (Payments → Buyer, Shipping → Buyer).",
+  description: "Token de servicio para comunicación inter-apps (Payments → Buyer, Shipping → Buyer). Variable: `PAYMENTS_TO_BUYER_SERVICE_TOKEN` o `SHIPPING_TO_BUYER_SERVICE_TOKEN`.",
 };
+
+const sellerServiceToken: OpenAPIV3.SecuritySchemeObject = {
+  type: "apiKey",
+  in: "header",
+  name: "X-Service-Token",
+  description: "Token de servicio para comunicación Seller App → Buyer App. Variable: `SELLER_TO_BUYER_SERVICE_TOKEN`.",
+};
+
 
 const schemas: Record<string, OpenAPIV3.SchemaObject> = {
   BuyerProfile: {
@@ -161,11 +169,13 @@ const schemas: Record<string, OpenAPIV3.SchemaObject> = {
       id: { type: "string" },
       title: { type: "string" },
       description: { type: "string" },
-      price: { type: "number" },
+      priceCents: { type: "integer", description: "Precio en centavos (ARS)" },
+      weightGrams: { type: "integer", nullable: true },
+      category: { type: "string", nullable: true, example: "bicicletas", description: "bicicletas | componentes | accesorios | indumentaria" },
       sellerId: { type: "string", nullable: true },
       sellerName: { type: "string", nullable: true },
       imageUrl: { type: "string", nullable: true },
-      stock: { type: "integer" },
+      isActive: { type: "boolean" },
       createdAt: { type: "string", format: "date-time" },
       updatedAt: { type: "string", format: "date-time" },
     },
@@ -196,28 +206,14 @@ export const openapiSpec: OpenAPIV3.Document = {
     { url: "http://localhost:3000", description: "Desarrollo local" },
   ],
   components: {
-    securitySchemes: { ClerkJWT: clerkAuth, ServiceToken: serviceToken },
+    securitySchemes: {
+      ClerkJWT: clerkAuth,
+      ServiceToken: serviceToken,
+      SellerServiceToken: sellerServiceToken,
+    },
     schemas,
   },
   paths: {
-    "/api/products": {
-      get: {
-        tags: ["Productos"],
-        summary: "Listar productos",
-        description: "Devuelve todos los productos disponibles. Ruta pública.",
-        responses: {
-          "200": {
-            description: "Lista de productos",
-            content: {
-              "application/json": {
-                schema: { type: "array", items: { $ref: "#/components/schemas/Product" } },
-              },
-            },
-          },
-        },
-      },
-    },
-
     "/api/v1/buyer/profile": {
       get: {
         tags: ["Perfil"],
@@ -551,6 +547,56 @@ export const openapiSpec: OpenAPIV3.Document = {
       },
     },
 
+    "/api/v1/buyer/orders/{orderId}/cancel": {
+      post: {
+        tags: ["Órdenes"],
+        summary: "Cancelar orden",
+        description: "El comprador cancela su propia orden. Solo es posible si el estado es `PENDING_PAYMENT`, `PAID` o `PAYMENT_FAILED`.",
+        security: [{ ClerkJWT: [] }],
+        parameters: [
+          { name: "orderId", in: "path", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          "200": {
+            description: "Orden cancelada",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    status: { type: "string", example: "CANCELLED" },
+                  },
+                },
+              },
+            },
+          },
+          "401": { description: "No autenticado" },
+          "404": { description: "Orden no encontrada" },
+          "409": {
+            description: "La orden no puede cancelarse en su estado actual",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "object",
+                      properties: {
+                        code: { type: "string", example: "ORDER_NOT_CANCELLABLE" },
+                        message: { type: "string" },
+                        details: { type: "object" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+
     "/api/v1/buyer/checkout": {
       post: {
         tags: ["Checkout"],
@@ -629,6 +675,54 @@ export const openapiSpec: OpenAPIV3.Document = {
           "200": { description: "Estado actualizado", content: { "application/json": { schema: { $ref: "#/components/schemas/Order" } } } },
           "401": { description: "Token inválido" },
           "404": { description: "Orden no encontrada" },
+        },
+      },
+    },
+
+    "/api/v1/orders/{orderId}/seller-groups/{groupId}/status": {
+      patch: {
+        tags: ["Inter-servicios"],
+        summary: "Aceptar orden (Seller App → Buyer)",
+        description: "Llamado por Seller App cuando el vendedor acepta la orden. Transiciona el grupo de `PENDING` a `PREPARING`. Requiere X-Service-Token configurado como `SELLER_TO_BUYER_SERVICE_TOKEN`.",
+        security: [{ SellerServiceToken: [] }],
+        parameters: [
+          { name: "orderId", in: "path", required: true, schema: { type: "string" } },
+          { name: "groupId", in: "path", required: true, schema: { type: "string" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["status"],
+                properties: {
+                  status: { type: "string", enum: ["preparing"] },
+                },
+              },
+              example: { status: "preparing" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Estado actualizado a PREPARING",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    status: { type: "string", example: "PREPARING" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Estado inválido" },
+          "401": { description: "Token inválido" },
+          "404": { description: "Grupo no encontrado" },
+          "409": { description: "Transición de estado no permitida (no está en PENDING)" },
         },
       },
     },
