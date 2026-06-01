@@ -2,25 +2,33 @@
 
 # BiciMarket — Buyer App
 
-Aplicación del **comprador** del marketplace BiciMarket. Permite navegar el catálogo, gestionar el carrito, hacer checkout y ver el historial de pedidos.
+## Deploy
+
+https://proyecto-c-buyer2-bicimarket.vercel.app/
 
 ---
 
-## 🚀 Deploy
+## Usuarios de prueba
 
-- **URL**: https://proyecto-c-buyer2-bicimarket.vercel.app/
-- **Admin**: email `admin@test.com` | contraseña `Admin1234!`
-- **Comprador**: email `comprador@test.com` | contraseña `Comprador1234!`
+| Nombre | Email | Contraseña | Rol |
+|--------|-------|------------|-----|
+| buyer admin | buyerclerktest@iaw.com | iawuser# | Admin (acceso a `/admin`) |
+| buyer1 operator | buyer1clerktest@iaw.com | iawuser# | Comprador |
+| buyer2 operator | buyer2clerktest@iaw.com | iawuser# | Comprador |
 
-> Para crear un admin nuevo: registrarse normalmente → ir al Clerk Dashboard → buscar el usuario → editar `publicMetadata` → agregar `{ "admin": true }`.
-
----
-
-## Stack
-
-Next.js 16 · PostgreSQL · Prisma · Clerk · Tailwind CSS · shadcn/ui · Zustand · TanStack Query
+> El usuario `buyer admin` tiene `{ "admin": true }` en su `publicMetadata` de Clerk, lo que habilita el acceso al panel de administración.
 
 ---
+
+## Instrucciones para evaluar la app
+
+**Flujo de prueba sugerido:**
+1. Ingresar con `buyer1clerktest@iaw.com` → navegar el catálogo → agregar productos al carrito
+2. Ir a checkout → seleccionar dirección → confirmar pedido
+3. Ver la orden generada en el historial de pedidos
+4. Ingresar con `buyerclerktest@iaw.com` → revisar el panel `/admin`
+
+---- 
 
 ## Setup local
 
@@ -43,135 +51,6 @@ npm run dev
 ```
 
 > **Nota:** cada vez que cambiás `prisma/schema.prisma` tenés que correr `npx prisma generate` y luego `npx prisma db push`.
-
----
-
-## Arquitectura
-
-Esta app es una de cuatro apps independientes del sistema. Cada app tiene su propia base de datos; todas comparten el mismo proyecto de Clerk.
-
-| App | Responsable | 
-|-----|-------------|
-| **Buyer App** | **Camila Rojas** | 
-| Seller App | Pierino Spina | 
-| Shipping App | Enrique Seitz | 
-| Payments App | Rocco Paoloni | 
-
-Ver `documentacion/` para la arquitectura completa del sistema.
-
----
-
-## Estructura del proyecto
-
-```
-src/
-├── app/                        # App Router — páginas y rutas API
-│   ├── layout.tsx              # Layout raíz (Clerk + QueryProvider)
-│   ├── page.tsx                # Home
-│   ├── admin/                  # Panel de administración (protegido)
-│   ├── dashboard/              # Dashboard del comprador (protegido)
-│   ├── shop/                   # Catálogo de productos
-│   ├── cart/                   # Carrito de compras
-│   ├── checkout/               # Proceso de pago
-│   ├── orders/                 # Historial de pedidos
-│   ├── profile/                # Perfil y direcciones
-│   ├── sign-in/                # Login (Clerk)
-│   ├── sign-up/                # Registro (Clerk)
-│   └── api/
-│       └── v1/                 # Todos los endpoints viven bajo /api/v1/
-│           ├── buyer/          # Endpoints que usa la UI del Buyer App
-│           │   ├── profile/
-│           │   ├── addresses/
-│           │   ├── cart/
-│           │   ├── favorites/
-│           │   ├── orders/
-│           │   └── checkout/
-│           └── orders/         # Endpoints que llaman otras apps (X-Service-Token)
-│               └── [orderId]/
-│                   ├── route.ts                    # PATCH status (←Payments)
-│                   └── seller-groups/
-│                       └── [groupId]/
-│                           └── shipping/
-│                               └── route.ts        # PATCH shipping (←Shipping)
-├── components/
-│   ├── ui/                     # shadcn/ui components
-│   └── buyer/                  # Componentes propios del Buyer App
-├── hooks/
-│   ├── use-buyer.ts            # Todos los hooks de React Query
-│   └── use-mobile.ts
-├── lib/
-│   ├── prisma.ts               # Cliente Prisma singleton
-│   ├── axios.ts                # Cliente Axios para llamadas desde la UI
-│   ├── buyer-service.ts        # Lógica de negocio del comprador
-│   ├── service-client.ts       # Factory de clientes HTTP server-to-server
-│   ├── service-auth.ts         # Validación de X-Service-Token
-│   ├── seller-api.ts           # Llamadas a Seller App
-│   ├── shipping-api.ts         # Llamadas a Shipping App
-│   └── payments-api.ts         # Llamadas a Payments App
-├── providers/
-│   └── query-provider.tsx      # TanStack Query provider
-├── store/
-│   └── use-cart-store.ts       # Estado de UI del carrito (Zustand)
-└── types/
-    ├── buyer.ts                # Tipos del dominio Buyer App
-    ├── api.ts                  # Tipos genéricos de respuesta API
-    └── inter-service.ts        # Tipos de contratos con otras apps
-
-prisma/
-├── schema.prisma               # Modelos de base de datos
-├── seed.ts                     # Script de datos de prueba
-└── migrations/                 # Historial de migraciones
-
-referencias/                    # Documentación para beginners (14 archivos)
-documentacion/                  # Documentación general del sistema (compartida con el equipo)
-```
-
----
-
-## Rutas de la app
-
-| Ruta | Descripción |
-|------|-------------|
-| `/` | Home público |
-| `/shop` | Catálogo de productos |
-| `/dashboard` | Dashboard del comprador (requiere login) |
-| `/cart` | Carrito de compras |
-| `/checkout` | Proceso de pago |
-| `/orders` | Historial de pedidos |
-| `/profile` | Perfil y direcciones de envío |
-| `/admin` | Panel de administración (requiere `publicMetadata.admin = true`) |
-
----
-
-## APIs del Buyer App
-
-### Endpoints para la UI (autenticación con Clerk JWT)
-
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/api/v1/buyer/profile` | Obtiene o crea el perfil del comprador |
-| PATCH | `/api/v1/buyer/profile` | Actualiza datos del perfil |
-| GET | `/api/v1/buyer/addresses` | Lista las direcciones guardadas |
-| POST | `/api/v1/buyer/addresses` | Agrega una dirección |
-| PATCH | `/api/v1/buyer/addresses/[id]` | Edita una dirección |
-| DELETE | `/api/v1/buyer/addresses/[id]` | Elimina una dirección |
-| GET | `/api/v1/buyer/cart` | Obtiene el carrito activo con totales |
-| POST | `/api/v1/buyer/cart` | Agrega un ítem al carrito |
-| PATCH | `/api/v1/buyer/cart/[id]` | Actualiza cantidad de un ítem |
-| DELETE | `/api/v1/buyer/cart/[id]` | Elimina un ítem del carrito |
-| GET | `/api/v1/buyer/favorites` | Lista favoritos |
-| POST | `/api/v1/buyer/favorites` | Agrega un favorito |
-| DELETE | `/api/v1/buyer/favorites/[id]` | Elimina un favorito |
-| GET | `/api/v1/buyer/orders` | Lista órdenes del comprador |
-| GET | `/api/v1/buyer/orders/[id]` | Detalle de una orden |
-| POST | `/api/v1/buyer/checkout` | Convierte el carrito en orden |
-
-### Endpoints para otras apps (autenticación con X-Service-Token)
-
-| Método | Ruta | Llamado por |
-|--------|------|-------------|
-| PATCH | `/api/v1/orders/[id]` | Payments App (cambio de estado de pago) |
-| PATCH | `/api/v1/orders/[id]/seller-groups/[gId]/shipping` | Shipping App (cambio de estado de envío) |
 
 ---
 
@@ -199,25 +78,44 @@ npx prisma generate && npm run dev
 
 ---
 
+## Descripción del proyecto
+
+BiciMarket es un marketplace de compra y venta de bicicletas y accesorios. Esta app es la interfaz del comprador: permite navegar el catálogo por categoría y precio, guardar favoritos, armar un carrito persistente, hacer checkout con múltiples vendedores, y hacer seguimiento del historial de pedidos con sus estados. Incluye además un panel de administración para gestionar compradores, carritos y órdenes.
+
+El sistema completo está compuesto por cuatro apps independientes (Buyer, Seller, Shipping y Payments), cada una con su propia base de datos y desplegadas por separado. Todas comparten el mismo proyecto de Clerk para autenticación. La comunicación entre apps se hace server-to-server usando un `X-Service-Token`. La Buyer App consume el catálogo de productos del Seller App en tiempo real y expone endpoints que Payments, Seller y Shipping llaman para actualizar el estado de los pedidos.
+
+**Stack:** Next.js 16 (App Router) · PostgreSQL · Prisma · Clerk · Tailwind CSS · shadcn/ui · Zustand · TanStack Query · Zod · react-hook-form · Framer Motion
+
+El carrito persiste en base de datos (no solo en estado local). El checkout agrupa los items por vendedor, creando un `OrderSellerGroup` por cada uno con su propio estado de envío. Las órdenes mantienen un historial de estados y las direcciones de envío se guardan como snapshot en la orden para preservar el historial aunque el usuario las modifique después.
+
+Ver `documentacion/` para la arquitectura completa del sistema.
+
+---
+
+## Notas para la corrección
+
+**Integraciones simuladas:**
+- **Pagos (Payments App):** La integración está simulada. Al confirmar el checkout se genera una URL de pago mock en lugar de contactar al Payments App real. Los endpoints para recibir actualizaciones de estado de pago están implementados y funcionan si Payments los llama.
+- **Costos de envío (Shipping App):** Si `SHIPPING_APP_URL` no está configurada, los costos se calculan con una fórmula mock ($10.000 base + $4.000 por vendedor). El endpoint para recibir actualizaciones de estado de envío está implementado.
+
+**Integraciones reales:**
+- **Catálogo (Seller App):** Los productos se obtienen en tiempo real desde el Seller App. Hay un fallback a datos hardcodeados si la URL no está configurada, lo que permite que la app funcione de forma autónoma.
+- La Buyer App implementa tres endpoints receptores que otras apps pueden llamar para actualizar el estado del pago, del envío y de la aceptación de cada orden por parte del vendedor.
+
+**Decisiones de diseño:**
+- Zustand solo maneja el estado de UI del checkout (dirección seleccionada, nota de pedido). El carrito persiste en PostgreSQL.
+- Todas las integraciones externas tienen fallback graceful: la app funciona completamente sin las otras apps levantadas.
+- `service-auth.ts` centraliza la validación de `X-Service-Token` y rechaza con 401 si el token es inválido, manteniendo los endpoints inter-servicios seguros en cualquier ambiente.
+
+**Limitaciones conocidas:**
+- El flujo de pago está simulado: al confirmar el checkout se genera una URL mock en lugar de redirigir a un gateway real.
+- Los estados de las órdenes (pago, envío) solo avanzan si las otras apps del sistema llaman los endpoints correspondientes.
+
+---
+
 ## Documentación
 
-La carpeta `referencias/` tiene documentación paso a paso pensada para principiantes en Next.js:
-
-| Archivo | Tema |
-|---------|------|
-| `01-introduccion-nextjs.md` | Qué es Next.js 16 y cómo funciona el App Router |
-| `02-configuracion-proyecto.md` | Setup del proyecto, variables de entorno, Clerk, DB |
-| `03-prisma-modelos-buyer.md` | Modelos de datos, queries Prisma, migraciones |
-| `04-api-buyer.md` | Todos los endpoints con ejemplos de request/response |
-| `05-frontend-buyer.md` | Páginas, componentes, formularios, shadcn/ui |
-| `06-react-query-zustand.md` | React Query y Zustand explicados con ejemplos |
-| `07-clerk-autenticacion.md` | Cómo funciona Clerk en este proyecto |
-| `08-como-usar-la-app.md` | Tutorial de uso completo paso a paso |
-| `09-debugging-nextjs.md` | Errores comunes y cómo resolverlos |
-| `10-glosario.md` | Glosario de términos técnicos |
-| `11-flujo-completo.md` | Traza completa del flujo de compra multi-vendedor |
-| `12-inter-servicios.md` | Comunicación entre las 4 apps del sistema |
-| `13-typescript-guia.md` | TypeScript en este proyecto |
-| `14-agregar-funcionalidad.md` | Tutorial: agregar una nueva funcionalidad end-to-end |
-
-La documentación general del sistema (arquitectura, contratos de API, modelos compartidos) está en `documentacion/`.
+- [Estructura del proyecto](documentacion-buyer/estructura-proyecto.md)
+- [Rutas de la app](documentacion-buyer/rutas.md)
+- [Endpoints API](documentacion-buyer/endpoints-api.md)
+- [Documentación general del sistema](documentacion/) — arquitectura, contratos de API, modelos compartidos

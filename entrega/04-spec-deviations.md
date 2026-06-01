@@ -1,19 +1,59 @@
 # 04 — Specification vs Implementation Deviations
 
-> Source of truth: `documentacion/03-apis.md`, `documentacion/04-modelo-de-datos.md`, `documentacion/02-responsabilidades.md`
+> Source of truth: `/documentacion/03-apis.md` and `/documentacion/04-modelo-de-datos.md`
+> Each deviation is classified: Critical / Important / Minor / Justified
 
 ---
 
-## DEV-01: Checkout Payment Integration (CRITICAL)
+## DEV-01: Checkout request body missing `seller_groups` parameter
 
 ### Expected
-`documentacion/03-apis.md §P1`: Buyer App calls `POST /api/v1/payments` on Payments App, receives `{ payment_id, checkout_url }`, stores `payment_id`, and redirects buyer to `checkout_url`.
-
-`documentacion/02-responsabilidades.md §3.2`: Buyer App must "Disparar el cobro hacia Payments con un `Idempotency-Key` único por orden."
+Spec (`documentacion/03-apis.md`, section B5 — `POST /api/v1/buyer/checkout`):
+```json
+{
+  "shipping_address_id": "adr_01H…",
+  "seller_groups": [
+    { "seller_profile_id": "slp_01H…", "shipping_quote_id": "qte_01H…" },
+    { "seller_profile_id": "slp_02H…", "shipping_quote_id": "qte_02H…" }
+  ],
+  "notes": "Dejar en portería si no hay nadie."
+}
+```
 
 ### Actual
-`src/app/api/v1/buyer/checkout/route.ts:168` calls `createPaymentSession` from `lib/buyer-service.ts`, which returns a **hardcoded mock**:
-```ts
+`src/app/api/v1/buyer/checkout/route.ts` validates:
+```typescript
+const checkoutSchema = z.object({
+  shippingAddressId: z.string().min(1),
+  notes: z.string().optional(),
+  returnUrl: z.string().url(),
+});
+```
+No `seller_groups` with `shipping_quote_id`. The checkout route automatically groups cart items by seller and calls `getShippingQuotes()` internally to get quotes, without requiring the client to pre-fetch quotes and pass them in.
+
+### Files Involved
+- `src/app/api/v1/buyer/checkout/route.ts`
+- `src/lib/shipping-api.ts`
+
+### Impact
+The checkout contract does not match the spec. Other apps (Payments, Seller) that may call this endpoint in Etapa 3 will send the spec-compliant body and receive a 400 validation error. Also, there's no `shipping_quote_id` stored in `OrderSellerGroup.shippingQuoteId` for validation.
+
+### Is the deviation justified?
+**YES** — for Etapa 2 isolation. Since Shipping App is mocked, the app calculates quotes internally. The spec's design requires the frontend to first call Shipping App for quotes, then pass quote IDs to checkout, which is a 2-step process. The current implementation collapses this into 1 step internally.
+
+### Required Action
+Document this in README under "Decisions de diseño." In Etapa 3, the checkout API will need to be updated to accept the spec-compliant request body. Add a TODO comment in the checkout route.
+
+---
+
+## DEV-02: Payment session is fully mocked
+
+### Expected
+Spec (`documentacion/03-apis.md`, section B5): The checkout flow should call `POST /api/v1/payments` on the Payments App, receive `{payment_id, checkout_url}`, redirect to Mercado Pago.
+
+### Actual
+`src/lib/buyer-service.ts`:
+```typescript
 export async function createPaymentSession(orderId: string, totalCents: number) {
   return {
     paymentId: `pay_${orderId}`,
@@ -22,359 +62,211 @@ export async function createPaymentSession(orderId: string, totalCents: number) 
   };
 }
 ```
-`lib/payments-api.ts::createPayment` (the correct function that would call the real Payments App) **is never invoked** by the checkout flow.
+The payment URL is a fake local URL that does not redirect anywhere useful.
 
 ### Files Involved
-- `src/app/api/v1/buyer/checkout/route.ts` (line 168)
-- `src/lib/buyer-service.ts` (lines 44-50)
-- `src/lib/payments-api.ts` (correct implementation, unused in checkout)
+- `src/lib/buyer-service.ts` (`createPaymentSession`)
+- `src/lib/payments-api.ts` (exists but calls `createPaymentSession` which is hardcoded mock)
 
 ### Impact
-Checkout is completely broken in production. The buyer is redirected to `https://example-payment.local/...` which does not exist. No real payment is ever initiated. Even when `PAYMENTS_APP_URL` is set correctly, the Payments App is never contacted during checkout.
+The checkout flow cannot complete. Users who proceed through checkout will receive a non-functional payment URL. Order status will stay at `PENDING_PAYMENT` forever since no payment provider will call the callback.
 
 ### Is the deviation justified?
-**NO.** The `payments-api.ts` file already has the correct implementation ready to use. This appears to be an integration oversight where the developer wrote the mock in `buyer-service.ts` during development and forgot to replace it with the real call.
+**YES for Etapa 2** — the assignment explicitly allows mocking inter-app calls. The README clearly states this. The contract is maintained (the endpoint returns a URL and order ID).
 
 ### Required Action
-In `checkout/route.ts`, replace the call to `createPaymentSession` with a call to `createPayment` from `payments-api.ts`:
-```ts
-import { createPayment } from "@/lib/payments-api";
-// ...
-const payment = await createPayment({
-  order_id: order.id,
-  buyer_clerk_user_id: userId,
-  buyer_profile_id: profile.id,
-  amount_cents: totalCents,
-  currency: "ARS",
-  items_summary: groupedData.map(g => ({
-    seller_profile_id: g.sellerProfileId,
-    subtotal_cents: g.itemsSubtotalCents,
-    shipping_cost_cents: g.shippingCostCents,
-  })),
-  idempotency_key: crypto.randomUUID(),
-  return_urls: {
-    success: `${process.env.NEXT_PUBLIC_APP_URL}/orders/${order.id}?payment=success`,
-    failure: `${process.env.NEXT_PUBLIC_APP_URL}/orders/${order.id}?payment=failure`,
-    pending: `${process.env.NEXT_PUBLIC_APP_URL}/orders/${order.id}?payment=pending`,
-  },
-});
-```
+The README note is sufficient for Etapa 2. In Etapa 3, replace `createPaymentSession` with a real HTTP call to Payments App.
 
 ---
 
-## DEV-02: Cart POST — Client-Supplied Price Data
+## DEV-03: `/api/products` not under `/api/v1/`
 
 ### Expected
-`documentacion/03-apis.md §B3`: `POST /api/v1/buyer/cart` request body is `{ "product_id": "prd_01H…", "quantity": 1 }`. The documentation states: "Buyer App llama internamente a `GET /api/v1/products/{id}/availability` en Seller App para resolver `seller_profile_id`, `unit_price_cents`, `weight_grams`."
+Spec (`documentacion/02-responsabilidades.md`, §2 Rule 1): "Todos los endpoints viven bajo `/api/v1/...`."
 
 ### Actual
-`src/app/api/v1/buyer/cart/route.ts:7-15` accepts and validates:
-```ts
-const cartItemSchema = z.object({
-  productId: z.string().min(1),
-  sellerProfileId: z.string().min(1),
-  productNameSnapshot: z.string().min(1),
-  unitPriceCents: z.number().int().nonnegative(),
-  quantity: z.number().int().positive(),
-  weightGramsSnapshot: z.number().int().nonnegative(),
-  currency: z.string().optional(),
-});
-```
-The server accepts whatever price the client sends, never calls Seller App.
+`src/app/api/products/route.ts` — catalog proxy endpoint lives at `/api/products`, not `/api/v1/products`.
 
 ### Files Involved
-- `src/app/api/v1/buyer/cart/route.ts`
-- `src/lib/seller-api.ts` (has `getProductAvailability` — unused in cart route)
-- `src/app/shop/page.tsx` (the frontend that sends all product data from mock)
+- `src/app/api/products/route.ts`
+- `src/app/api/products/[productId]/route.ts`
 
 ### Impact
-- **Security**: Buyer can set `unitPriceCents: 1` for any product, creating orders at ARS 0.01
-- **Spec violation**: Seller App availability is never verified before adding to cart
-- **Functional**: Products added to cart may reflect stale prices if mock changes
+The versioning convention is violated. However, this route is an internal UI proxy, not part of the external inter-service API contract. The actual spec endpoint `GET /api/v1/products` is served by the Seller App, not the Buyer App. So the Buyer App is proxying it at a non-standard path for its own frontend use.
 
 ### Is the deviation justified?
-**NO.** The availability check is both a business requirement (confirm product is active) and a security requirement (server-side price resolution). The deviation is a development shortcut.
+**YES** — this endpoint is exclusively for the Buyer App's own frontend (the public shop page). It's not in the inter-service contract. Naming it `/api/products` vs `/api/v1/products` is a minor internal convention issue.
 
 ### Required Action
-Modify `cart/route.ts` to accept only `{ productId, quantity }`, then call `getProductAvailability(productId)` to resolve seller ID, price, and weight. Return 409 if product is not active.
+None. Optionally rename to `/api/v1/catalog` for consistency.
 
 ---
 
-## DEV-03: Checkout Schema — Missing seller_groups Array
+## DEV-04: Checkout response shape differs from spec
 
 ### Expected
-`documentacion/03-apis.md §B5` checkout request:
-```json
-{
-  "shipping_address_id": "adr_01H…",
-  "seller_groups": [
-    { "seller_profile_id": "slp_01H…", "shipping_quote_id": "qte_01H…" },
-    { "seller_profile_id": "slp_02H…", "shipping_quote_id": "qte_02H…" }
-  ],
-  "notes": "..."
-}
-```
+Spec returns the full order object with seller_groups, items, totals, payment redirect info.
 
 ### Actual
-`src/app/api/v1/buyer/checkout/route.ts:12-16`:
-```ts
-const checkoutSchema = z.object({
-  shippingAddressId: z.string().min(1),
-  notes: z.string().optional(),
-  returnUrl: z.string().url(),
-});
+`src/app/api/v1/buyer/checkout/route.ts` returns:
+```typescript
+return NextResponse.json({ paymentUrl: payment.paymentUrl, orderId: order.id });
 ```
-No `seller_groups` or `shipping_quote_id`. The checkout calls Shipping App internally and generates quotes without storing or validating `quote_id`.
+
+### Files Involved
+- `src/app/api/v1/buyer/checkout/route.ts`
+
+### Impact
+Minimal — the frontend only uses `paymentUrl` and `orderId` after checkout. But the full order is not returned, meaning the client must make a separate call to `GET /api/v1/buyer/orders/{id}` to display order details. The spec contract is not honored.
+
+### Is the deviation justified?
+**YES** — for the frontend use case, only `paymentUrl` and `orderId` are needed immediately. The spec's response shape is aspirational.
+
+### Required Action
+Minor. Document in README.
+
+---
+
+## DEV-05: `PATCH /api/v1/orders/{id}/seller-groups/{id}/shipping` — wrong endpoint path in spec
+
+### Expected
+Spec (`documentacion/02-responsabilidades.md`, §3.5): Shipping App calls `PATCH /api/v1/orders/{id}/seller-groups/{groupId}/shipping`
+
+### Actual
+Implemented at `src/app/api/v1/orders/[orderId]/seller-groups/[groupId]/shipping/route.ts` ✅
+
+The route accepts `{status, shipping_status, shipment_id, tracking_number, tracking_url}`.
+
+### Files Involved
+- `src/app/api/v1/orders/[orderId]/seller-groups/[groupId]/shipping/route.ts`
+
+### Impact
+No deviation — the endpoint matches the spec path. The request body schema is slightly extended (adds `tracking_url` not in spec), which is not a problem.
+
+### Is the deviation justified?
+N/A — this is a match.
+
+### Required Action
+None.
+
+---
+
+## DEV-06: `PATCH /api/v1/orders/{id}` — spec says endpoint at `/orders/{id}/status`, implementation at `/orders/{id}`
+
+### Expected
+Spec (`documentacion/03-apis.md`, §B5): `PATCH /api/v1/orders/{orderId}` (spec actually uses this path, not `/status`). Implementation matches.
+
+Actually looking at the spec: `PATCH /api/v1/orders/{orderId}/status` (server-to-server from Payments) in `documentacion/02-responsabilidades.md` §3.5 but `PATCH /api/v1/orders/{orderId}` in the API spec `03-apis.md`. There's an inconsistency in the docs themselves.
+
+### Actual
+Implemented at `src/app/api/v1/orders/[orderId]/route.ts` as `PATCH /api/v1/orders/{orderId}`.
+
+### Files Involved
+- `src/app/api/v1/orders/[orderId]/route.ts`
+
+### Impact
+Matches the more authoritative `03-apis.md`. The minor inconsistency is in the documentation itself.
+
+### Is the deviation justified?
+YES — implementation follows `03-apis.md` which is the canonical API spec.
+
+### Required Action
+None.
+
+---
+
+## DEV-07: Order cancel endpoint at `/buyer/orders/{id}/cancel`, spec says `/buyer/orders/{orderId}/cancel`
+
+### Expected
+`POST /api/v1/buyer/orders/{orderId}/cancel`
+
+### Actual
+`src/app/api/v1/buyer/orders/[orderId]/cancel/route.ts` ✅ — matches.
+
+### Required Action
+None.
+
+---
+
+## DEV-08: Checkout doesn't call Shipping App for quotes per spec flow
+
+### Expected
+Spec flow: frontend calls checkout → checkout calls Shipping App's `POST /api/v1/shipping-quotes` to get quote IDs → quote IDs included in checkout body.
+
+### Actual
+`src/app/api/v1/buyer/checkout/route.ts` calls `getShippingQuotes()` directly from `src/lib/shipping-api.ts`, which returns either real Shipping App data or a mock calculation. The `shippingQuoteId` is **not stored** in the created `OrderSellerGroup` (the field is left null).
 
 ### Files Involved
 - `src/app/api/v1/buyer/checkout/route.ts`
 - `src/lib/shipping-api.ts`
 
 ### Impact
-- Shipping quotes are never persisted with TTL validation — a quote cannot expire because it's never stored
-- `shippingQuoteId` on `OrderSellerGroup` is always `null` (set to null implicitly since never provided)
-- Actually: the code does set `shippingQuoteId: "quote_seed_002"` in seed but the real checkout never provides it
-- Downstream systems (Seller App, Shipping App) cannot validate a quote against a stored record
+- `OrderSellerGroup.shippingQuoteId` is always `null` in orders created via this flow
+- In Etapa 3, Shipping App won't be able to validate the quote when Seller calls `POST /api/v1/shipments`
+- The `quoteResponse.total_net_cents` is used to set shipping cost, which is correct in effect
 
 ### Is the deviation justified?
-**PARTIALLY**. If Shipping App is mocked (no real quote TTL enforcement), this works. But it breaks the contract when real apps are integrated.
+**YES for Etapa 2** — Shipping App is mocked.
 
 ### Required Action
-Accept `seller_groups` with `shipping_quote_id` in the checkout schema, OR document explicitly that quote IDs are not stored/validated in this implementation.
+Add a TODO comment. In Etapa 3: store the `shippingQuoteId` per seller group after quotes are received.
 
 ---
 
-## DEV-04: OrderSellerGroup.shippingCostCents Always Zero
+## DEV-09: `BuyerProfile` missing `Role` enum field
 
 ### Expected
-`documentacion/04-modelo-de-datos.md §1.1`: `order_seller_groups.shipping_cost_cents` should reflect "el costo de envío cotizado para este grupo."
+Memory/earlier versions of schema mention a `Role` enum (USER/ADMIN) on `BuyerProfile`.
 
 ### Actual
-`src/app/api/v1/buyer/checkout/route.ts:132`:
-```ts
-shippingCostCents: 0,
-```
-The total shipping is calculated correctly (`shippingTotalCents` in `Order`), but the per-group breakdown always shows 0.
+`prisma/schema.prisma` — no `Role` field on `BuyerProfile`. Admin role is managed entirely through Clerk `publicMetadata.admin`. No local role stored in the database.
 
 ### Files Involved
-- `src/app/api/v1/buyer/checkout/route.ts` (line 132)
+- `prisma/schema.prisma`
 
 ### Impact
-- `OrderSellerGroup.shippingCostCents` is always 0 in the DB
-- API responses for order detail will show 0 shipping per seller group
-- Downstream apps (Seller App receiving sales_order) may receive incorrect `shipping_cost_cents`
-- Admin panel showing per-group cost will be wrong
+None functional — admin access is correctly gated via Clerk metadata. The local DB doesn't need to duplicate this.
 
 ### Is the deviation justified?
-**NO.** The shipping quotes are calculated by `getShippingQuotes` and `total_net_cents` is available. The per-group cost needs to be distributed from this total.
+**YES** — Clerk is the source of truth for roles per the system design. Duplicating roles in the DB would create a sync problem.
 
 ### Required Action
-Distribute shipping cost per seller group. The simplest approach: divide `shippingTotalCents` equally or use per-group quote if available.
+None.
 
 ---
 
-## DEV-05: No Idempotency-Key Support
+## DEV-10: `ShippingStatus` enum includes `CREATED` but spec seller_group shipping_status doesn't start at `CREATED`
 
 ### Expected
-`documentacion/02-responsabilidades.md §2` Rule 5: "todo POST que crea recursos acepta header `Idempotency-Key`."
-`documentacion/03-apis.md §B5`: "`POST /api/v1/buyer/checkout` — **Idempotency-Key obligatorio.**"
+The `OrderSellerGroup.shippingStatus` should mirror the `shipment.status` states from Shipping App, which starts at `created`. The spec `04-modelo-de-datos.md` §1.1 says:
+> `shipping_status` | enum (ver §6.4) — espejo del shipment, sincronizado vía PATCH REST
 
 ### Actual
-Checkout (`checkout/route.ts`) reads the request body but never reads the `Idempotency-Key` header. No deduplication logic exists.
+`prisma/schema.prisma` correctly defines `ShippingStatus` with `CREATED` as first value. The `shipping/route.ts` includes `"created"` in the valid enum for the PATCH body.
 
 ### Files Involved
-- `src/app/api/v1/buyer/checkout/route.ts`
+- `prisma/schema.prisma`
+- `src/app/api/v1/orders/.../shipping/route.ts`
 
 ### Impact
-A double-click or network retry could create two identical orders for the same cart.
-
-### Is the deviation justified?
-**NO.** This is explicitly required for checkout.
+No deviation — matches spec.
 
 ### Required Action
-Read `Idempotency-Key` header in checkout. Check DB for existing order with that key before creating a new one. Return existing order if found.
+None.
 
 ---
 
-## DEV-06: Order Cancellation Allows PAID Orders
+## Summary
 
-### Expected
-`documentacion/03-apis.md §B5`: "Solo si `status=pending_payment`."
-
-### Actual
-`src/app/api/v1/buyer/orders/[orderId]/cancel/route.ts:7-11`:
-```ts
-const CANCELLABLE_STATUSES: OrderStatus[] = [
-  "PENDING_PAYMENT",
-  "PAID",
-  "PAYMENT_FAILED",
-];
-```
-Allows cancellation of `PAID` orders, which the spec explicitly forbids.
-
-### Files Involved
-- `src/app/api/v1/buyer/orders/[orderId]/cancel/route.ts`
-
-### Impact
-A buyer could cancel an order that has already been paid, potentially without refund logic being triggered.
-
-### Is the deviation justified?
-**PARTIALLY**. Including `PAYMENT_FAILED` makes sense (buyer should be able to dismiss failed orders). Including `PAID` is incorrect per spec.
-
-### Required Action
-Remove `"PAID"` from `CANCELLABLE_STATUSES`. Consider keeping `PAYMENT_FAILED`.
-
----
-
-## DEV-07: No middleware.ts for Clerk
-
-### Expected
-`documentacion/05-usuarios.md §3` and Clerk Next.js documentation: authentication should be enforced at the middleware level to protect routes from edge.
-
-### Actual
-No `middleware.ts` in project root or `src/`. Auth is only checked at:
-1. Layout component level (page routes)
-2. Individual API route handlers
-
-### Files Involved
-- (file missing: `src/middleware.ts` or `middleware.ts`)
-
-### Impact
-- Without middleware, Next.js edge runtime does not pre-validate auth tokens before rendering
-- API routes are still protected by individual `auth()` calls, so API security is intact
-- Page routes could briefly render before redirect in SSR, depending on how Clerk handles this
-
-### Is the deviation justified?
-**MINOR**. The app still functions securely for API routes. The gap is primarily about best practice and edge-level protection.
-
-### Required Action
-Add `middleware.ts`:
-```ts
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-const isProtectedRoute = createRouteMatcher(["/(auth)(.*)", "/admin(.*)"]);
-export default clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) await auth.protect();
-});
-export const config = { matcher: ["/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)", "/(api|trpc)(.*)"] };
-```
-
----
-
-## DEV-08: Profile PATCH Missing default_shipping_address_id
-
-### Expected
-`documentacion/03-apis.md §B1`: PATCH profile allows updating `default_shipping_address_id`.
-
-### Actual
-`src/app/api/v1/buyer/profile/route.ts:7-10`:
-```ts
-const updateProfileSchema = z.object({
-  fullName: z.string().min(2).optional(),
-  phone: z.string().optional(),
-});
-```
-No `defaultShippingAddressId` field.
-
-### Files Involved
-- `src/app/api/v1/buyer/profile/route.ts`
-
-### Impact
-Buyer cannot update their default shipping address via API. The UI address selector in checkout would need a workaround.
-
-### Is the deviation justified?
-**NO.** The field is documented as settable.
-
-### Required Action
-Add `defaultShippingAddressId: z.string().optional()` to the profile patch schema.
-
----
-
-## DEV-09: IDs Without Resource Prefixes
-
-### Expected
-`documentacion/04-modelo-de-datos.md §0`: "IDs: `String @id @default(cuid())` con prefijo de recurso (`ord_`, `prd_`, etc.) generado en aplicación."
-
-### Actual
-`prisma/schema.prisma`: All models use `@id @default(cuid())` with no prefix. IDs are bare CUIDs.
-
-### Files Involved
-- `prisma/schema.prisma` (all model definitions)
-
-### Impact
-IDs are not distinguishable by type. Log messages and API responses will show opaque IDs without type context. Less impactful for correctness, more for debuggability.
-
-### Is the deviation justified?
-**PARTIALLY**. Many production apps skip prefixes. In an academic context where the spec explicitly requires them, it's a deviation.
-
-### Required Action
-Create a helper `createId(prefix: string)` that returns `prefix + cuid()`. Use in model defaults via application-level generation before insert.
-
----
-
-## DEV-10: No X-Request-Id Propagation
-
-### Expected
-`documentacion/02-responsabilidades.md §2` Rule 8: "cada request inter-app lleva `X-Request-Id: <uuid>` que se propaga en cadena."
-
-### Actual
-`src/lib/service-client.ts` creates Axios instances with `X-Service-Token` but no `X-Request-Id` header.
-
-### Files Involved
-- `src/lib/service-client.ts`
-
-### Impact
-Cross-app request tracing is not possible. Cannot correlate a buyer checkout with downstream shipping/payment calls in logs.
-
-### Is the deviation justified?
-**MINOR** for an academic project. Would be critical in production.
-
-### Required Action
-In `service-client.ts`, add a request interceptor that generates and forwards `X-Request-Id: crypto.randomUUID()`.
-
----
-
-## DEV-11: No Retry Logic on Inter-App Calls
-
-### Expected
-`documentacion/02-responsabilidades.md §2` Rule 7: "Si fallan con 5xx o timeout, el emisor reintenta hasta 3 veces con backoff lineal (1s, 3s, 9s)."
-
-### Actual
-`src/lib/service-client.ts` creates a plain Axios instance with no retry interceptor. If Seller/Shipping/Payments App returns 5xx, the error propagates immediately.
-
-### Files Involved
-- `src/lib/service-client.ts`
-
-### Impact
-Transient failures in other apps will immediately fail the buyer request. For a demo where apps are stable, low impact. In production, high impact.
-
-### Is the deviation justified?
-**MINOR** for academic scope.
-
-### Required Action
-Add axios-retry or a manual retry interceptor in `service-client.ts`.
-
----
-
-## DEV-12: Seed Price Inconsistency
-
-### Expected
-Seed data should match mock product data for a coherent demo.
-
-### Actual
-- `prisma/seed.ts` Trek Marlin: `price: 450000` (ARS 4,500 in centavos = ARS 45.00 if 100-based, or ARS 4,500 if already centavos)
-- `src/lib/seller-api.ts` MOCK_PRODUCTS Trek Marlin: `price_cents: 130000000` (ARS 1,300,000)
-
-These are wildly different values for the same product by the same ID (`prd_mock_001`).
-
-### Files Involved
-- `prisma/seed.ts` (line 12-17)
-- `src/lib/seller-api.ts` (line 79-92)
-
-### Impact
-Order history (seeded at ARS 4,500) will look inconsistent compared to the shop (showing ARS 1,300,000). A professor examining orders vs shop prices will see a mismatch.
-
-### Is the deviation justified?
-**NO.** Simple oversight.
-
-### Required Action
-Align seed prices with mock product prices. Use `price_cents: 130000000` in seed for Trek Marlin.
+| ID | Description | Severity | Justified |
+|---|---|---|---|
+| DEV-01 | Checkout missing seller_groups/quote_id params | Important | YES (Etapa 2) |
+| DEV-02 | Payment session fully mocked | Important | YES (Etapa 2) |
+| DEV-03 | /api/products not under /api/v1/ | Minor | YES |
+| DEV-04 | Checkout response shape simplified | Minor | YES |
+| DEV-05 | Shipping PATCH endpoint | No deviation | N/A |
+| DEV-06 | Order status PATCH path | No deviation | N/A |
+| DEV-07 | Order cancel endpoint | No deviation | N/A |
+| DEV-08 | shippingQuoteId not stored | Important | YES (Etapa 2) |
+| DEV-09 | No Role field in BuyerProfile | Minor | YES |
+| DEV-10 | ShippingStatus enum | No deviation | N/A |

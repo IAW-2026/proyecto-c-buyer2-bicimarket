@@ -11,9 +11,9 @@ export default function Error({
 }) {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-4">
-      <h1 className="text-4xl font-bold">Algo salio mal</h1>
+      <h1 className="text-4xl font-bold">Algo salió mal</h1>
       <p className="text-lg text-muted-foreground">
-        {error.message || "Ocurrio un error inesperado."}
+        {error.message || "Ocurrió un error inesperado."}
       </p>
       <Button onClick={reset}>Intentar de nuevo</Button>
     </main>

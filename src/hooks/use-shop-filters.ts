@@ -17,11 +17,14 @@ export function useShopFilters(products: Product[] | undefined) {
   const minPrice = Number(searchParams.get("minPrice") ?? 0);
   const maxPrice = Number(searchParams.get("maxPrice") ?? 1_000_000_000);
   const bikeType = searchParams.get("bikeType") ?? "";
+  const page = Math.max(1, Number(searchParams.get("page") ?? 1));
 
-  const filters = { searchQuery, category, onlyInStock, selectedSellers, minPrice, maxPrice, bikeType };
+  const filters = { searchQuery, category, onlyInStock, selectedSellers, minPrice, maxPrice, bikeType, page };
 
   function updateParams(updates: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams.toString());
+    // reset to page 1 whenever a filter (not page itself) changes
+    if (!("page" in updates)) params.delete("page");
     for (const [key, value] of Object.entries(updates)) {
       if (value === null || value === "") {
         params.delete(key);
@@ -107,6 +110,10 @@ export function useShopFilters(products: Product[] | undefined) {
     router.replace(`${pathname}${qs ? `?${qs}` : ""}`);
   }
 
+  function setPage(value: number) {
+    updateParams({ page: value > 1 ? String(value) : null });
+  }
+
   return {
     filters,
     filtered,
@@ -119,5 +126,6 @@ export function useShopFilters(products: Product[] | undefined) {
     setCategory,
     setBikeType,
     clearFilters,
+    setPage,
   };
 }

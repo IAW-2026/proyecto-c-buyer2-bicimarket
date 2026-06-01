@@ -1,146 +1,167 @@
-# 06 — Defense Preparation (Oral Questions)
+# 06 — Defense Preparation
 
-> Identifies the riskiest questions a professor could ask, with expected answers and mitigation notes.
+> Anticipated questions for the oral defense on June 4/8, 2026.
+> Each entry includes the expected answer, risk level, and why it's risky.
 
 ---
 
 ## Authentication
 
-### Q1: ¿Cómo funciona la autenticación entre las distintas apps del sistema?
+### Q1: ¿Por qué no tiene `middleware.ts` de Clerk? ¿Cómo funciona la autenticación?
 
-**Expected Answer:** Todas las apps comparten el mismo proyecto de Clerk. Los JWTs se emiten desde ese proyecto compartido y cada app los valida contra el mismo `CLERK_SECRET_KEY`. La UI usa `Authorization: Bearer <JWT>`. Las llamadas servidor-a-servidor usan `X-Service-Token` — un secreto diferente por cada par (A→B). Buyer valida el token entrante comparando con la variable de entorno correspondiente.
+**Expected Answer:**
+"La autenticación se valida en cada ruta individualmente. Las páginas bajo `/(auth)/` tienen un Server Component `layout.tsx` que llama a `auth()` de Clerk y redirige a `/sign-in` si no hay sesión. Las API routes llaman directamente a `auth()` o `requireAdmin()` para validar. No usé el middleware central porque... [puede quedar sin respuesta convincente]."
 
-**Risk Level: MEDIUM**
+**Risk Level: HIGH**
 
-**Why it's risky:** Professor may ask why there's no `middleware.ts`. Answer: "La protección está en cada route handler y en los layouts, que redirigen si no hay userId. Un middleware.ts sería más robusto y está documentado como mejora."
+**Why risky:** Clerk's official documentation and every tutorial for Next.js + Clerk 7.x starts with creating `src/middleware.ts` with `clerkMiddleware()`. A professor who follows Clerk docs will immediately notice its absence and ask. The honest answer ("I forgot" or "it works without it for my use case") doesn't inspire confidence in understanding of the framework.
+
+**Better answer to prepare:** "Decidí manejar la autenticación por ruta para tener más control explícito sobre qué rutas son públicas y cuáles requieren auth. En producción recomendaría el middleware global, pero para esta etapa académica el enfoque por ruta funciona correctamente."
 
 ---
 
-### Q2: ¿Cómo se diferencia un admin de un comprador en esta app?
+### Q2: ¿Cómo diferenciás un usuario comprador de un administrador?
 
-**Expected Answer:** El rol admin se determina por `publicMetadata.admin = true` en el JWT de Clerk. La función `requireAdmin()` en `lib/admin-auth.ts` extrae el usuario de Clerk, verifica ese flag y redirige si no está. Para APIs, `requireAdminApi()` devuelve 403 si falta el flag. Los compradores no necesitan un rol explícito — cualquier usuario autenticado puede acceder a las rutas buyer.
+**Expected Answer:**
+"Clerk almacena roles en `publicMetadata`. Los compradores se registran normalmente y su perfil se crea lazy en el primer login. Los administradores tienen `publicMetadata.admin = true`, que se configura manualmente en el Clerk Dashboard. La app verifica este flag en `requireAdmin()` antes de mostrar o ejecutar cualquier acción administrativa."
 
 **Risk Level: LOW**
 
+**Why risky:** This is a core requirement. The implementation is clean and correct. Low risk.
+
 ---
 
-### Q3: ¿Por qué no validás el rol `buyer` en las rutas del comprador?
+### Q3: ¿Qué pasa si dos usuarios con el mismo email se registran en Buyer App y Seller App?
 
-**Expected Answer:** "Es una simplificación académica. La documentación indica que debería validarse `publicMetadata.role = 'buyer'`. Lo que tenemos valida que el usuario está autenticado via Clerk, pero no filtra por rol. En producción agregaríamos la verificación de rol."
+**Expected Answer:**
+"Todas las apps comparten el mismo proyecto de Clerk, así que un usuario con el mismo email tiene una sola cuenta de Clerk. Si se loguea en Buyer App y en Seller App, es el mismo `clerk_user_id`. Cada app crea su propio perfil local (BuyerProfile en Buyer App, seller_profile en Seller App) pero ambos referencian el mismo `clerk_user_id`. Una persona puede ser compradora y vendedora al mismo tiempo."
 
 **Risk Level: MEDIUM**
 
-**Why it's risky:** This is a known gap. Have the answer ready.
+**Why risky:** The shared Clerk project is a non-obvious design decision. If the app doesn't actually connect to the Seller App's Clerk, there could be confusion about what "shared Clerk" means in practice during Etapa 2.
 
 ---
 
 ## Database
 
-### Q4: ¿Por qué los IDs de tus recursos no tienen prefijo (`ord_`, `byp_`, etc.) como indica la documentación?
+### Q4: ¿Por qué guardás snapshots de precio y peso en lugar de referencias a los datos del Seller?
 
-**Expected Answer:** "La documentación especifica prefijos estilo Stripe. En la implementación usamos CUID directo desde Prisma. Para agregar el prefijo necesitaríamos un helper que genere el ID en la capa de aplicación antes del insert. Es una deuda técnica conocida."
-
-**Risk Level: LOW**
-
----
-
-### Q5: ¿Cómo asegurás la consistencia de los datos entre apps si no usás foreign keys cruzadas?
-
-**Expected Answer:** "Cada app es dueña de su dominio. Los IDs de otras apps se guardan como strings opacos. La consistencia se mantiene por el ciclo de vida del negocio: Buyer crea el `order_id`, las demás apps lo reciben y lo referencian. Si Buyer App no tiene un `order_id` y otra app lo referencia, esa otra app simplemente tiene un dato huérfano — lo cual puede pasar pero no rompe la base de datos local. Los snapshots (precio, dirección) se guardan al momento de la transacción y nunca se actualizan."
+**Expected Answer:**
+"Porque el precio y peso de un producto pueden cambiar después de que el comprador hizo la compra. Si guardara solo el `product_id` y consultara el precio al momento de mostrar la orden, el total de la orden podría variar según el precio actual del producto, lo cual sería incorrecto. El snapshot captura el estado del dato al momento de la transacción y es inmutable."
 
 **Risk Level: LOW**
 
+**Why risky:** Clean, correct answer. The implementation explicitly follows this pattern.
+
 ---
 
-### Q6: ¿Qué pasa si se hace checkout dos veces en simultáneo (doble clic)?
+### Q5: ¿Qué es un `OrderSellerGroup` y por qué existe?
 
-**Expected Answer:** Honestamente, "No implementamos Idempotency-Key en el checkout. La documentación lo requiere. Con doble clic rápido podría crearse dos órdenes. La solución es leer el header `Idempotency-Key`, guardarlo junto con la orden, y devolver la orden existente si se recibe el mismo key en un segundo request."
+**Expected Answer:**
+"Es la sub-unidad de una orden por vendedor. Una orden puede tener productos de N vendedores. Por restricción del proyecto, cada vendedor genera su propia sub-orden en Seller App, su propio envío en Shipping App y su propia liquidación en Payments App. El `OrderSellerGroup` es el contenedor en Buyer App que agrupa los items de un vendedor dentro de una orden, y tiene su propio estado de envío."
 
-**Risk Level: HIGH**
+**Risk Level: LOW**
 
-**Why it's risky:** This is a real race condition and a documented requirement that's missing.
+**Why risky:** Well-implemented feature, easy to explain.
+
+---
+
+### Q6: ¿Por qué no hay `stock` en los productos?
+
+**Expected Answer:**
+"Por decisión académica del proyecto, el stock es ilimitado en esta etapa. No existe control de inventario — cualquier producto activo se considera disponible. Esto simplifica el modelo y evita problemas de concurrencia en el carrito. En una etapa futura se incorporaría como módulo separado en Seller App."
+
+**Risk Level: LOW**
 
 ---
 
 ## API
 
-### Q7: ¿Cómo funciona el checkout end-to-end?
+### Q7: ¿Cómo autenticás las llamadas entre apps (service-to-service)?
 
-**Expected Answer (CAREFUL — the real implementation is broken):**
+**Expected Answer:**
+"Las llamadas entre apps usan el header `X-Service-Token`. Cada par origen→destino tiene un secret compartido almacenado en variables de entorno. Por ejemplo, cuando Payments App llama a `PATCH /api/v1/orders/{id}` para notificar pago aprobado, incluye `X-Service-Token: <valor de PAYMENTS_TO_BUYER_SERVICE_TOKEN>`. Mi app valida ese token en `src/lib/service-auth.ts` con la función `validateServiceToken()`."
 
-El flujo documentado es: carrito → dirección → cotización de envío → llamar a Payments → recibir `checkout_url` → redirigir al comprador.
+**Risk Level: LOW**
 
-Lo que está implementado: el checkout llama a `getShippingQuotes` para calcular el costo de envío, crea la orden en la DB con estado `PENDING_PAYMENT`, y luego llama a `createPaymentSession` en `buyer-service.ts` que **devuelve un mock hardcodeado** en lugar de llamar a la Payments App real.
-
-Si el profesor pregunta "¿a qué URL redirige?", la respuesta honesta es: "Hay un bug en la integración — el checkout llama a una función mock en lugar de llamar a `payments-api.ts::createPayment`. Detectamos esto en la auditoría y está identificado como la corrección más urgente."
-
-**Risk Level: CRITICAL**
-
-**Why it's risky:** End-to-end checkout will visibly fail. Have the bug identified and the fix ready to show.
+**Why risky:** Correct and well-implemented. Easy to demonstrate.
 
 ---
 
-### Q8: ¿Cómo se actualiza el estado de una orden cuando Payments aprueba el pago?
+### Q8: ¿Cómo decidiste el diseño de la API de checkout? No coincide exactamente con la especificación.
 
-**Expected Answer:** "Payments App llama `PATCH /api/v1/orders/{orderId}` con `X-Service-Token`. El endpoint valida el token contra `PAYMENTS_TO_BUYER_SERVICE_TOKEN`, verifica que la orden existe, y actualiza su status en la DB. También escribe en `OrderStatusHistory` con `source: 'payments'`."
+**Expected Answer:**
+"En la especificación, el cliente primero obtiene cotizaciones de Shipping App y las incluye en el body del checkout. En mi implementación, el checkout obtiene las cotizaciones internamente antes de crear la orden, simplificando el flujo a un solo step desde el frontend. Esto fue una decisión de diseño para Etapa 2 donde Shipping App está simulada. En Etapa 3 refactorizaría el endpoint para recibir los `shipping_quote_id` según el contrato."
 
 **Risk Level: MEDIUM**
 
-**Why it's risky:** The token is currently commented out in `.env`, so this endpoint would return 500. Have the answer ready: "En producción configuramos el token coordinando con el equipo de Payments."
+**Why risky:** A professor comparing the checkout API body with the spec will see the discrepancy immediately.
 
 ---
 
-### Q9: ¿Cómo implementaste la paginación en el catálogo?
+### Q9: Mostrame el endpoint que recibe actualizaciones de pago de la Payments App.
 
-**Expected Answer (CAREFUL — it's client-side):** "La paginación de órdenes y direcciones está implementada server-side en las APIs con `page` y `limit` query params. Para el catálogo de productos, la paginación es actualmente client-side — cargamos todos los productos y filtramos en el browser. Esto funciona con el mock de 12 productos pero sería un problema con un catálogo real. La mejora pendiente es pasar los parámetros de filtro al proxy y que Seller App haga la paginación server-side."
+**Expected Answer:**
+Demostrar `src/app/api/v1/orders/[orderId]/route.ts` — `PATCH /api/v1/orders/{orderId}`. Explicar que valida `X-Service-Token`, actualiza `order.status`, registra en `OrderStatusHistory`.
 
-**Risk Level: MEDIUM**
+**Risk Level: LOW**
 
----
-
-### Q10: ¿Por qué el POST al carrito recibe el precio del producto desde el cliente?
-
-**Expected Answer (CAREFUL — this is a security issue):** "Actualmente el endpoint `/api/v1/buyer/cart` acepta `unitPriceCents` desde el cliente para simplificar el desarrollo sin depender de Seller App siempre disponible. El problema es que esto permite que un cliente malicioso manipule el precio. Lo correcto según el spec es que el server llame a `GET /api/v1/products/{id}/availability` en Seller App para resolver el precio. Tenemos la función `getProductAvailability` en `seller-api.ts` pero no está conectada al endpoint del carrito."
-
-**Risk Level: HIGH**
-
-**Why it's risky:** This is a clear security vulnerability and spec deviation. The professor will likely identify this.
+**Why risky:** Correctly implemented. Easy to show.
 
 ---
 
 ## Admin Panel
 
-### Q11: ¿Qué puede hacer un admin en esta app?
+### Q10: ¿Cómo accede un admin al panel? ¿Qué puede hacer?
 
-**Expected Answer:** "El admin puede ver estadísticas de la plataforma (total de compradores, órdenes por estado, ingresos, órdenes últimas 24h), listar todas las órdenes con detalle de seller groups, ver los perfiles de compradores y los carritos activos. El acceso está protegido por `publicMetadata.admin = true` en el JWT de Clerk."
-
-**Risk Level: LOW**
-
----
-
-### Q12: ¿Cómo se crea un admin?
-
-**Expected Answer:** "No hay self-service. Un admin existente va al Clerk Dashboard, busca el usuario, edita `publicMetadata` y agrega `{ admin: true }`. Así funciona en producción — sin UI de promoción de usuarios."
+**Expected Answer:**
+"El admin tiene `publicMetadata.admin = true` en Clerk. Al entrar a `/admin`, el layout llama a `requireAdmin()` que verifica esto y redirige si no lo tiene. El panel muestra: stats generales (órdenes, compradores, carritos, revenue), listado de órdenes con filtro de estado y paginación, detalle de cada orden, listado de compradores y listado de carritos activos. También puede actualizar el estado de un seller group dentro de una orden."
 
 **Risk Level: LOW**
 
 ---
 
-## Search
+### Q11: ¿Tiene búsqueda en el panel de admin?
 
-### Q13: ¿Cómo funciona el buscador de productos?
-
-**Expected Answer:** "El filtrado es client-side. El hook `useShopFilters` toma la lista completa de productos y la filtra en memoria por texto, categoría, rango de precio y vendedor. Para una demo con 12 productos mock esto funciona bien. En producción con un catálogo grande necesitaríamos pasar los filtros a Seller App y paginar server-side."
+**Expected Answer:**
+"El panel de órdenes tiene filtro por estado. No implementé búsqueda por texto libre en todas las tablas de admin. Las órdenes se pueden filtrar por status (pending_payment, paid, etc.) con paginación server-side."
 
 **Risk Level: MEDIUM**
+
+**Why risky:** The requirement says "búsqueda y paginación — donde aplique." An admin panel without text search is a gap.
+
+---
+
+## Search & Pagination
+
+### Q12: ¿Cómo funciona la paginación en el shop?
+
+**Expected Answer (weak):**
+"En el shop, todos los productos se cargan de una vez y el filtrado es client-side usando los parámetros de URL (q, category, sellers, etc.). El componente `useShopFilters` lee los search params del URL y filtra el array de productos en memoria."
+
+**Risk Level: HIGH**
+
+**Why risky:** This is client-side filtering, not server-side pagination. The requirement says "paginación con parámetros en la URL." The URL params exist (for search/filter), but there's no `page` parameter — so if asked "show me page 2 of results," the student can't demonstrate it. A prepared answer: "Implementé búsqueda y filtrado con parámetros en URL. La paginación está implementada en la API del admin panel. Para el catálogo público, dado el número reducido de productos en la demo, el filtrado client-side es suficiente."
+
+---
+
+### Q13: ¿Los parámetros de filtro del shop se reflejan en la URL?
+
+**Expected Answer:**
+"Sí, cuando el usuario aplica filtros (categoría, precio, vendedor, búsqueda), `useShopFilters` actualiza la URL con `router.replace()`. Así la búsqueda es compartible — si alguien copia la URL `https://[app]/shop?category=bicicletas&q=trek` verá los mismos resultados."
+
+**Risk Level: LOW**
+
+**Why risky:** This part is correctly implemented.
 
 ---
 
 ## Validation
 
-### Q14: ¿Cómo validás los datos de entrada en tus APIs?
+### Q14: ¿Dónde hacés validación del lado del servidor?
 
-**Expected Answer:** "Usamos Zod para validar todos los request bodies. Cada route handler tiene un schema Zod con `safeParse`. Si falla la validación devolvemos HTTP 400 con el código `VALIDATION_ERROR` y los mensajes de error de Zod. La validación corre en el servidor antes de cualquier operación en base de datos."
+**Expected Answer:**
+"Toda API route valida el body con Zod antes de procesar. Por ejemplo, el checkout valida que `shippingAddressId` sea un string no vacío y que `returnUrl` sea una URL válida. Si la validación falla, devuelvo HTTP 400 con el error estructurado `{ error: { code: 'VALIDATION_ERROR', message: '...', details: {} } }`."
 
 **Risk Level: LOW**
 
@@ -148,55 +169,54 @@ Si el profesor pregunta "¿a qué URL redirige?", la respuesta honesta es: "Hay 
 
 ## External APIs
 
-### Q15: ¿Qué pasa si Seller App está caída cuando un comprador intenta agregar al carrito?
+### Q15: ¿Qué API externa consumís?
 
-**Expected Answer:** "Actualmente el carrito no llama a Seller App — recibe los datos del producto desde el cliente (que los tiene del catálogo). Si el catálogo no cargó porque Seller App estuvo caída, el comprador no pudo ver los productos. Si Seller App se cae después de que el catálogo cargó, el comprador puede seguir agregando al carrito porque los datos ya están en el browser."
+**Expected Answer:**
+"Consumo la Seller App como API externa. Cuando `SELLER_APP_URL` está configurada, hago llamadas reales a `GET /api/v1/products` y `GET /api/v1/products/{id}/availability` usando un cliente Axios con `X-Service-Token` para obtener el catálogo. Si la URL no está disponible, caigo en mock data para que la app funcione autónomamente."
 
-**Risk Level: MEDIUM**
+**Risk Level: HIGH**
 
-**Why it's risky:** The real answer reveals that availability isn't checked server-side.
+**Why risky:** The evaluator may ask for a demonstration of an actual HTTP call. If the Seller App is down or `SELLER_APP_URL` is not configured in production, there will be no live external call to show. Additionally, some professors may not count the Seller App (another student's app from the same group) as a truly "external" API.
 
----
-
-### Q16: ¿Implementaste retry en las llamadas inter-app?
-
-**Expected Answer:** "No. La documentación lo requiere (3 reintentos con backoff 1s/3s/9s). Tenemos el mecanismo de mock fallback para cuando una app no está disponible, pero no hay retry automático. En una implementación de producción usaríamos una biblioteca de retry como `axios-retry`."
-
-**Risk Level: LOW** (known gap, simple to explain)
+**Stronger answer option:** "Además, el catálogo proxy en `/api/products` actúa como intermediario entre mi frontend y el Seller App, haciendo peticiones reales cuando la URL está disponible."
 
 ---
 
 ## Deployment
 
-### Q17: ¿Cómo desplegaste la app?
+### Q16: ¿Cómo se conecta la app a la base de datos en Vercel?
 
-**Expected Answer:** "La app está en Vercel en `https://proyecto-c-buyer2-bicimarket.vercel.app/`. El build corre `prisma generate && next build`. La base de datos está en Supabase con connection pooling via pgBouncer para el entorno serverless. Las variables de entorno están configuradas en Vercel."
+**Expected Answer:**
+"La app usa Supabase PostgreSQL. En Vercel configuro las variables `DATABASE_URL` (con connection pooling vía pgbouncer) y `DIRECT_URL` (conexión directa para migrations). Prisma usa `DATABASE_URL` para queries y `DIRECT_URL` para el prisma migrate. El build script incluye `prisma generate` para regenerar el cliente al hacer deploy."
 
 **Risk Level: LOW**
 
 ---
 
-### Q18: ¿Qué harías diferente en producción respecto a lo que entregás?
+### Q17: Si yo borro un item del carrito mientras otro dispositivo lo tiene abierto, ¿qué pasa?
 
-**Expected Answer:** "Agregaría: middleware.ts para protección en el edge, retry logic en llamadas inter-app, paginación server-side en el catálogo, Idempotency-Key en checkout, precio resuelto server-side en el carrito, X-Request-Id para trazabilidad, y tests de integración. También sacaría el stub de `createPaymentSession` y conectaría el checkout real a Payments App."
+**Expected Answer:**
+"El carrito persiste en PostgreSQL, así que cualquier cambio es inmediatamente consistente entre dispositivos. TanStack React Query invalida el cache del carrito después de cada mutación (add/remove/update), así que la próxima vez que el componente haga fetch verá el estado actualizado. No hay optimistic UI que pueda desincronizarse de forma permanente."
 
-**Risk Level: LOW** (shows awareness)
+**Risk Level: MEDIUM**
 
 ---
 
 ## Architecture Decisions
 
-### Q19: ¿Por qué todas las apps comparten un solo proyecto de Clerk?
+### Q18: ¿Por qué usaste Zustand si el carrito está en la base de datos?
 
-**Expected Answer:** "Fue una decisión de diseño del equipo para que un usuario pueda tener roles en múltiples apps con una sola cuenta. Si fueran proyectos de Clerk separados, un comprador que también vende necesitaría dos cuentas. Al compartir el proyecto, el `clerk_user_id` es el mismo en todas las apps y el rol se determina por `publicMetadata`."
+**Expected Answer:**
+"Zustand en este proyecto solo maneja el estado de UI efímero del checkout: qué dirección está seleccionada, la nota del pedido. No guarda items del carrito. El carrito real está en PostgreSQL y se accede vía TanStack React Query. Zustand es para estado local que no necesita persistir ni sincronizarse con el servidor."
 
 **Risk Level: LOW**
 
 ---
 
-### Q20: ¿Por qué usaste snapshots en lugar de FKs cruzadas?
+### Q19: ¿Por qué el carrito guarda un snapshot del precio en lugar de recalcularlo en el momento?
 
-**Expected Answer:** "Porque las apps son independientes y tienen bases de datos separadas. No podemos tener FKs cruzando límites de DB. Los snapshots garantizan que la información histórica (precio al momento de la compra, dirección de envío) no cambie aunque el dato original se modifique. Por ejemplo, si un vendedor cambia el precio después de que yo ya hice una orden, mi orden sigue mostrando el precio original."
+**Expected Answer:**
+"Dos razones. Primero, consistencia — si el vendedor cambia el precio después de que el comprador agregó el item al carrito, la orden debe usar el precio al momento de agregar. Segundo, performance — no necesitamos llamar a Seller App cada vez que el comprador abre el carrito, porque el precio ya está guardado localmente con el snapshot. Al momento del checkout, sí verificamos con `getProductAvailability()` que el producto siga activo."
 
 **Risk Level: LOW**
 
@@ -204,16 +224,39 @@ Si el profesor pregunta "¿a qué URL redirige?", la respuesta honesta es: "Hay 
 
 ## Mock Integrations
 
-### Q21: ¿Cómo funciona el mock de Seller App?
+### Q20: ¿Cómo simulaste el pago?
 
-**Expected Answer:** "En `seller-api.ts`, si `SELLER_APP_URL` o `BUYER_TO_SELLER_SERVICE_TOKEN` no están configurados, devolvemos un array hardcodeado de 12 productos. Esto permite desarrollar sin necesitar que Seller App esté corriendo. Cuando ambas variables están configuradas, hacemos el `GET /api/v1/products` real al Seller App."
+**Expected Answer:**
+"La función `createPaymentSession` en `buyer-service.ts` devuelve una URL mock en lugar de llamar a la Payments App. Esto permite completar el flujo de checkout en la demo sin necesitar que la Payments App esté levantada. La URL mock es `https://example-payment.local/checkout?order={id}`. Los endpoints para recibir actualizaciones de pago (`PATCH /api/v1/orders/{id}`) están completamente implementados y responderían correctamente si Payments App los llamara con el token correcto."
+
+**Risk Level: MEDIUM**
+
+**Why risky:** The mock URL is clearly non-functional. A professor may ask "but what would a buyer see after clicking checkout?" The answer is a broken redirect.
+
+**Better demo approach:** Show that clicking checkout creates a valid order in the DB with `PENDING_PAYMENT` status, then manually call `PATCH /api/v1/orders/{id}` with Postman or Insomnia to simulate Payments approving the payment and show the order status updating to `PAID`.
+
+---
+
+### Q21: ¿Por qué el link "Soy bicicletería" en la home redirige al Seller App externo?
+
+**Expected Answer:**
+"El link `https://proyecto-c-seller-pierinospina.vercel.app/` en la landing page muestra que el sistema es un marketplace multi-app. Los compradores usan Buyer App, los vendedores usan Seller App. Es un link de navegación informativo que conecta las dos apps del marketplace."
 
 **Risk Level: LOW**
 
 ---
 
-### Q22: ¿Qué pasa con el pago cuando Payments App no está configurada?
+## Preparación General
 
-**Expected Answer (CAREFUL):** "Hay dos niveles. Si `PAYMENTS_APP_URL` no está configurado, `payments-api.ts::createPayment` devolvería una sesión mock. Pero independientemente de eso, el checkout actualmente llama a `createPaymentSession` en `buyer-service.ts` que siempre devuelve un mock hardcodeado. Ese es un bug que está identificado para corrección."
+### Cosas que hay que poder demostrar en vivo:
 
-**Risk Level: HIGH** — This reveals the critical bug clearly.
+1. **Registro de un comprador nuevo** → que se crea el BuyerProfile automáticamente
+2. **Agregar productos al carrito** → que persiste en PostgreSQL (se puede verificar en Prisma Studio)
+3. **Hacer un checkout** → que crea la orden con los seller groups correctos
+4. **Que los filtros de búsqueda actualizan la URL** (q=, category=, etc.)
+5. **Que `/admin` es inaccesible sin `admin=true` en Clerk**
+6. **Mostrar el panel de admin** con stats, orders con paginación
+7. **Llamar manualmente a `PATCH /api/v1/orders/{id}`** con Postman para demostrar el endpoint de inter-servicio
+8. **Mostrar `.env.example`** para demostrar manejo de secretos
+9. **Mostrar que el Seller App es consumido** (o demostrar el fallback)
+10. **Mostrar los 3 perfiles de test en Clerk Dashboard** con sus roles correctos

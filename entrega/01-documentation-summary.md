@@ -1,164 +1,184 @@
-# 01 — Documentation Summary
+# 01 — Documentation Summary (Phase 1)
 
-> Source of truth: `documentacion/` (6 files) and `doc referencias/` (14 files).
-> Note: The audit prompt refers to `/docs` but this repository stores documentation in `documentacion/` and `doc referencias/`. This audit uses those as the source of truth.
+> Source of truth: `/documentacion/` (01–06) and `/doc referencias/` (02–15)
 
 ---
 
 ## 1. High-Level Description
 
-**BiciMarket** is an academic multi-vendor marketplace for bicycles and accessories. It is split into four independent web applications, each owning its own PostgreSQL database and REST API:
+BiciMarket is an Argentine bicycle marketplace. The system is composed of **four independent webapps**:
 
 | App | Owner | Role |
 |---|---|---|
-| **Buyer App** | Camila Rojas Fritz | Catalog browsing, cart, checkout, orders, favorites, addresses, profile |
-| Seller App | Pierino Spina | Vendor catalog management, sales order processing |
-| Shipping App | Enrique Seitz | Shipments, logistics operators, tracking |
+| **Buyer App** (this repo) | Camila Rojas Fritz | Front-end for buyers: catalog, cart, checkout, orders, favorites, profile |
+| Seller App | Pierino Spina | Catalog management, product publishing, sales order fulfillment |
+| Shipping App | Enrique Seitz | Shipment creation, tracking, logistics operators |
 | Payments App | Rocco Paoloni | Mercado Pago integration, settlements, refunds |
 
-All four apps share **one Clerk project** (owned by Buyer App). User roles are determined by `publicMetadata` in the JWT, not by separate accounts.
+Each app owns its own PostgreSQL database. All apps share **a single Clerk project** (owned by Buyer App). Inter-app communication is REST over HTTP with `X-Service-Token`. The only external webhook is Mercado Pago → Payments App.
 
 ---
 
 ## 2. Expected Architecture
 
-- **Framework**: Next.js (App Router) with TypeScript
-- **Database**: PostgreSQL 16+ via Prisma ORM, one DB per app
-- **Auth**: Clerk (shared project), `publicMetadata.role` for buyer/seller/logistics, `publicMetadata.admin` for admins
-- **UI**: React with shadcn/ui, TanStack Query, Zustand
-- **Inter-app communication**: REST over HTTP, authenticated with `X-Service-Token` (one secret per ordered pair of apps)
-- **State management**: Zustand for UI cart state, TanStack Query for server state
-- **Deployment**: Vercel for all four apps
+- **Framework**: Next.js (App Router, React Server Components)
+- **Database**: PostgreSQL via Prisma ORM — Buyer App owns `buyer_db`
+- **Auth**: Clerk — JWT for user→app calls, `X-Service-Token` for app→app calls
+- **Deployment**: Vercel (app) + Supabase/Railway (DB)
+- **State**: TanStack React Query (server state) + Zustand (UI-only state)
+- **UI**: Tailwind CSS + shadcn/ui
 
-All API routes live under `/api/v1/...`. The only exception is the Mercado Pago webhook at `/webhooks/mercadopago` (only on Payments App).
+### Buyer DB Tables (as specified in `documentacion/04-modelo-de-datos.md`)
+
+| Table | Purpose |
+|---|---|
+| `buyer_profiles` | Local profile linked to `clerk_user_id` |
+| `addresses` | Buyer's shipping addresses |
+| `carts` | One active cart per buyer |
+| `cart_items` | Items in cart with price/weight snapshot |
+| `favorite_items` | Wishlist (product references) |
+| `orders` | Source of truth for `order_id` |
+| `order_seller_groups` | One per seller per order (multi-seller support) |
+| `order_items` | Line items with full snapshot |
+| `order_status_history` | Audit log of order state transitions |
 
 ---
 
 ## 3. Main User Flows
 
-### 3.1 Purchase Flow (multi-vendor)
-1. Buyer browses catalog (proxied from Seller App)
-2. Buyer adds items to cart → Buyer App verifies availability via Seller App
-3. Buyer initiates checkout → Buyer App requests shipping quotes from Shipping App per vendor group
-4. Buyer App calls Payments App to create a payment → gets `checkout_url`
-5. Buyer is redirected to Mercado Pago checkout
-6. Mercado Pago sends webhook to Payments App → Payments PATCH Buyer order status
-7. Payments POSTs `sales_orders` to Seller App per vendor
-8. Seller prepares and marks `ready_to_ship` → Shipping creates `shipment`
-9. Shipping updates Buyer and Seller as parcel moves through states
-10. On `delivered`, Shipping notifies Payments → settlement and payout to vendor
+### 3.1 Browsing & Discovery
+- Unauthenticated users can access the home page (`/`) and shop (`/shop`)
+- Products proxied from Seller App via `GET /api/v1/products`
+- Filters: category, price range, seller, search query, bike type (all URL params)
 
-### 3.2 Profile Management
-- Buyer creates account via Clerk → profile auto-created on first request
-- Buyer can update name, phone, default shipping address
-- Buyer can CRUD delivery addresses
+### 3.2 Cart
+- Authenticated buyers add products to a persistent cart (stored in PostgreSQL)
+- Cart items capture price + weight snapshot from Seller App availability check
+- Cart is grouped by seller for shipping calculations
 
-### 3.3 Favorites
-- Buyer can add/remove products from wishlist (favoriteItems table)
+### 3.3 Checkout
+- Buyer selects a shipping address
+- Buyer App calls Shipping App for per-seller shipping quotes
+- Buyer App calls Payments App to create a payment session → redirects to checkout_url
+- Order is created with `status=PENDING_PAYMENT` + one `OrderSellerGroup` per seller
+- Cart is cleared and converted after order creation
 
-### 3.4 Order Tracking
-- Buyer sees order list with status tabs
-- Buyer can view individual order detail including seller groups and shipping status
-- Buyer can cancel orders in `pending_payment` status
+### 3.4 Order Lifecycle
+Orders transition: `PENDING_PAYMENT → PAID → PARTIALLY_SHIPPED → SHIPPED → DELIVERED → COMPLETED`
 
----
+State changes are driven by:
+- Payments App: `PATCH /api/v1/orders/{id}` → sets `PAID`, `PAYMENT_FAILED`, `REFUNDED`
+- Shipping App: `PATCH /api/v1/orders/{id}/seller-groups/{id}/shipping` → sets shipping statuses
+- Seller App: `PATCH /api/v1/orders/{id}/seller-groups/{id}/status` → sets `PREPARING`
 
-## 4. Expected APIs (Buyer App Endpoints)
-
-### Public user-facing (Clerk JWT required)
-| Endpoint | Description |
-|---|---|
-| `GET /api/v1/buyer/profile` | Get or create buyer profile |
-| `PATCH /api/v1/buyer/profile` | Update profile (name, phone, default_address) |
-| `GET /api/v1/buyer/addresses` | List addresses (paginated) |
-| `POST /api/v1/buyer/addresses` | Create address |
-| `PATCH /api/v1/buyer/addresses/{id}` | Update address |
-| `DELETE /api/v1/buyer/addresses/{id}` | Delete address |
-| `GET /api/v1/buyer/cart` | Get active cart |
-| `POST /api/v1/buyer/cart` | Add item (only product_id + quantity needed; Buyer resolves rest) |
-| `PATCH /api/v1/buyer/cart/{itemId}` | Update item quantity |
-| `DELETE /api/v1/buyer/cart/{itemId}` | Remove item |
-| `GET /api/v1/buyer/favorites` | List favorites |
-| `POST /api/v1/buyer/favorites` | Add favorite |
-| `DELETE /api/v1/buyer/favorites/{id}` | Remove favorite |
-| `GET /api/v1/buyer/orders` | List orders (paginated, filterable by status) |
-| `GET /api/v1/buyer/orders/{orderId}` | Order detail |
-| `POST /api/v1/buyer/checkout` | Create order from cart (Idempotency-Key required) |
-| `POST /api/v1/buyer/orders/{id}/cancel` | Cancel order if pending_payment |
-
-### Inter-app (X-Service-Token required)
-| Endpoint | Called by |
-|---|---|
-| `PATCH /api/v1/orders/{id}/status` | Payments App |
-| `PATCH /api/v1/orders/{id}/seller-groups/{g}/shipping` | Shipping App |
-| `PATCH /api/v1/orders/{id}/seller-groups/{g}/status` | Seller App |
+### 3.5 Admin Panel
+Admins (users with `publicMetadata.admin=true` in Clerk) can access `/admin`:
+- Stats overview (total orders, buyers, carts)
+- Orders management with status filter and pagination
+- Buyers listing
+- Carts listing
 
 ---
 
-## 5. Expected Database (Buyer App — `buyer_db`)
+## 4. Expected REST APIs (Buyer App exposes)
 
-Tables: `buyer_profiles`, `addresses`, `carts`, `cart_items`, `favorite_items`, `orders`, `order_seller_groups`, `order_items`, `order_status_history`
+### User-facing (Clerk JWT auth)
+- `GET/PATCH /api/v1/buyer/profile`
+- `GET/POST/PATCH/DELETE /api/v1/buyer/addresses/{id}`
+- `GET/POST/PATCH/DELETE /api/v1/buyer/cart` and `cart/{itemId}`
+- `GET/POST /api/v1/buyer/favorites` and `favorites/{id}`
+- `POST /api/v1/buyer/checkout`
+- `GET /api/v1/buyer/orders` and `orders/{id}`
+- `POST /api/v1/buyer/orders/{id}/cancel`
 
-Key constraints:
-- IDs: string with resource prefix (`ord_`, `byp_`, `crt_`, etc.), generated using CUID/ULID
-- Snapshots: price, weight, address — never updated once stored
-- Cross-app references: stored as opaque strings (no FK)
-- Audit table: `order_status_history` for every status change
+### Service-to-service (X-Service-Token auth)
+- `PATCH /api/v1/orders/{id}` ← Payments App (payment status updates)
+- `PATCH /api/v1/orders/{id}/seller-groups/{id}/shipping` ← Shipping App
+- `PATCH /api/v1/orders/{id}/seller-groups/{id}/status` ← Seller App
+
+### Admin (admin Clerk JWT)
+- `GET /api/admin/orders`, `GET /api/admin/orders/{id}`
+- `PATCH /api/admin/orders/{id}/seller-groups/{id}`
+- `GET /api/admin/buyers`
+- `GET /api/admin/carts`
+- `GET /api/admin/stats`
+
+---
+
+## 5. Expected Database Ownership
+
+The Buyer App **owns**:
+- All buyer-related data (profiles, addresses, carts, orders)
+- Order IDs (source of truth across all apps)
+
+The Buyer App **does NOT own**:
+- Products (Seller App is the source of truth)
+- Payments (Payments App is the source of truth)
+- Shipments (Shipping App is the source of truth)
+- Seller profiles (Seller App is the source of truth)
+
+References to external entities (product IDs, seller IDs, payment IDs, shipment IDs) are stored as **opaque strings** — no foreign keys to external tables.
 
 ---
 
 ## 6. Expected External Integrations
 
-| Service | Used for |
-|---|---|
-| Clerk | Authentication for all 4 apps (shared project) |
-| Seller App | Product catalog proxy, availability checks |
-| Shipping App | Shipping quotes, shipment status |
-| Payments App | Payment initiation, receipt retrieval |
-| Mercado Pago | Only via Payments App (Buyer App does NOT integrate directly) |
+| Service | Purpose | Auth |
+|---|---|---|
+| Seller App | Catalog proxy, product availability | `X-Service-Token` |
+| Shipping App | Shipping quotes during checkout | `X-Service-Token` |
+| Payments App | Create payment session, receive payment updates | `X-Service-Token` |
+| Clerk | Authentication (shared across all 4 apps) | JWT |
+
+During Etapa 2, Shipping and Payments App calls are **mocked/simulated** since those apps are developed independently. Seller App is consumed live if `SELLER_APP_URL` is set.
 
 ---
 
 ## 7. Expected Admin Capabilities
 
-- View all orders with filtering and pagination
-- View all buyer profiles
-- View active carts
-- View platform statistics (total buyers, revenue, orders by status)
-- Update order seller group status (via API)
-- Access protected by `publicMetadata.admin = true`
+- View all orders with pagination and status filtering
+- View order details (including seller groups and items)
+- Update seller group status (admin override)
+- View all buyers
+- View all carts with items
+- View platform-wide stats (counts of orders, buyers, carts, revenue)
 
 ---
 
 ## 8. Expected Authentication Model
 
-- **Buyers**: any Clerk user with `publicMetadata.role = "buyer"` — auto-provisioned on first login
-- **Admins**: Clerk user with `publicMetadata.admin = true` — promoted via Clerk Dashboard
-- **Service calls**: `X-Service-Token` header, one secret per directed app-to-app pair
-- **No Clerk webhooks** — profiles synced lazily on each request via JWT claims
+| Actor | Login method | Access |
+|---|---|---|
+| Buyer | Clerk sign-up/sign-in | Authenticated pages under `/(auth)/` |
+| Admin | Same Clerk account + `publicMetadata.admin=true` | `/admin/*` routes |
+
+- Buyer profile is created automatically on first login (lazy provisioning)
+- Admin role is manually assigned via Clerk Dashboard
+- Inter-app calls use `X-Service-Token` (not Clerk JWT)
+- No Clerk webhook setup — profile sync happens at request time via JWT claims
 
 ---
 
-## 9. Expected Mocked Integrations
+## 9. Expected Mocked Integrations (Etapa 2)
 
-Per documentation, when real app URLs are not configured:
-- Seller App: return mock product catalog
-- Shipping App: return mock shipping quotes
-- Payments App: return mock payment session with mock `checkout_url`
+Per the assignment, Etapa 2 apps must **mock** inter-app calls. For Buyer App:
+- **Payments App**: mock the `POST /api/v1/payments` call → return a fake checkout URL
+- **Shipping App**: mock shipping quote calculation → return a calculated cost
+- **Seller App**: optionally mock catalog if Seller App URL not available
 
-The inter-app mock behavior is explicitly documented as a dev convenience, NOT as production behavior.
+These mocks must **respect the defined contracts** (same request/response shapes) so they can be replaced by real calls in Etapa 3.
 
 ---
 
-## 10. Explicit Assumptions in Documentation
+## 10. Explicit Documentation Assumptions
 
-1. Stock is unlimited — no inventory management
-2. All apps share one Clerk project; role determined by `publicMetadata`
-3. Idempotency via header `Idempotency-Key` on all resource-creating POSTs
-4. All amounts in centavos (integer), currency always `"ARS"`
-5. All IDs have resource-type prefix (`ord_`, `byp_`, etc.)
-6. Snapshots are immutable once stored
-7. Failed inter-app calls retried 3 times (1s/3s/9s backoff)
-8. Error format: `{ "error": { "code": "...", "message": "...", "details": {} } }`
-9. Pagination default: `limit=20`, max `limit=100`
-10. Soft deletes for entities with relevant history
+1. Stock is unlimited — no inventory management in any app.
+2. All apps share one Clerk project (Buyer App's).
+3. Multi-seller orders are supported: one `OrderSellerGroup` per seller.
+4. Price and weight are always stored as snapshots at the time of the transaction.
+5. External service IDs (product IDs, seller IDs, etc.) are stored as opaque strings — no cross-DB foreign keys.
+6. Idempotency is required for all order-creating POST endpoints.
+7. All monetary amounts are in centavos (integer). Currency is always ARS.
+8. All IDs use string prefixes (e.g., `ord_`, `prd_`, `crt_`).
+9. No webhooks between internal apps — all notifications are synchronous REST calls.
+10. Retry policy for inter-app calls: 3 retries with backoff (1s, 3s, 9s).

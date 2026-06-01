@@ -114,7 +114,8 @@ const TABS = [
    MAIN PAGE
 ══════════════════════════════════════════════ */
 export default function HomePage() {
-  const { data: products, isLoading } = useProducts();
+  const { data: productsResult, isLoading } = useProducts();
+  const products = productsResult?.data;
   const { data: favoritesResult } = useFavoriteItems();
   const favorites = favoritesResult?.data;
   const { data: cart } = useBuyerCart();
@@ -534,7 +535,7 @@ function PromoBanner() {
       >
         <div className="flex flex-col gap-4">
           <p className="text-xs font-semibold uppercase tracking-widest text-primary">
-            Hot Sale BiciMarket · 24-31 Mayo
+            Hot Sale BiciMarket · 1-15 Junio
           </p>
           <h2 className="font-heading text-2xl font-bold leading-tight text-white lg:text-3xl">
             Hasta 35% off en cubiertas,<br />cámaras y accesorios.

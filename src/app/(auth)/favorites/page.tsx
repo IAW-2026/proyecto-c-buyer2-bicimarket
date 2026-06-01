@@ -14,7 +14,8 @@ import Link from "next/link";
 export default function FavoritesPage() {
   const [page, setPage] = useState(1);
   const { data: result, isLoading } = useFavoriteItems(page);
-  const { data: products } = useProducts();
+  const { data: productsResult } = useProducts();
+  const products = productsResult?.data;
   const { removeItem: removeFavorite } = useFavoriteMutations();
 
   const favorites = result?.data ?? [];

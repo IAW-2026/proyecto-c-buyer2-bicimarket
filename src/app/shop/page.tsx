@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Store, SlidersHorizontal } from "lucide-react";
 import { useProducts, useFavoriteItems, useBuyerCart } from "@/hooks/use-buyer";
 import { useCartMutations } from "@/hooks/querys/cart/useCartMutations";
@@ -10,17 +11,22 @@ import { FilterPanel } from "@/components/shop/filter-panel";
 import { ProductCard } from "@/components/shop/product-card";
 import { ProductGridSkeleton } from "@/components/shop/product-grid-skeleton";
 import { EmptyState } from "@/components/shared/empty-state";
+import { PaginationControls } from "@/components/shared/pagination-controls";
 import type { Product } from "@/types/buyer";
 
 function ShopContent() {
-  const { data: products, isLoading } = useProducts();
+  const searchParams = useSearchParams();
+  const page = Math.max(1, Number(searchParams.get("page") ?? 1));
+
+  const { data: productsResult, isLoading } = useProducts(page);
   const { data: favoritesResult } = useFavoriteItems();
   const favorites = favoritesResult?.data;
   const { data: cart } = useBuyerCart();
   const { addItem: addCartItem, removeItem: removeCartItem } = useCartMutations();
   const { addItem: addFavoriteItem, removeItem: removeFavoriteItem } = useFavoriteMutations();
-  const shopFilters = useShopFilters(products);
+  const shopFilters = useShopFilters(productsResult?.data);
 
+  const pagination = productsResult?.pagination;
   const favoriteProductIds = new Set(favorites?.map((f) => f.productId) ?? []);
   const cartProductIds = new Set(cart?.items.map((i) => i.productId) ?? []);
 
@@ -73,10 +79,10 @@ function ShopContent() {
                 : "Tienda"
               : "Tienda"}
           </h1>
-          {!isLoading && (
+          {!isLoading && pagination && (
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {shopFilters.filtered.length}{" "}
-              {shopFilters.filtered.length === 1 ? "producto" : "productos"}
+              {pagination.total}{" "}
+              {pagination.total === 1 ? "producto" : "productos"}
               {activeSearch && (
                 <span> para &ldquo;{activeSearch}&rdquo;</span>
               )}
@@ -113,6 +119,16 @@ function ShopContent() {
               />
             ))}
           </div>
+        )}
+
+        {pagination && (
+          <PaginationControls
+            page={page}
+            total={pagination.total}
+            limit={pagination.limit}
+            onChange={shopFilters.setPage}
+            className="mt-8"
+          />
         )}
       </div>
     </div>

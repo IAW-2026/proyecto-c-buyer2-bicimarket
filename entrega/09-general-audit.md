@@ -1,258 +1,198 @@
 # 09 — General Audit
 
-> Cross-cutting concerns, dead code, TODOs, security, naming, and anything not covered by the phase-specific audits.
+> Cross-cutting findings not captured in previous phases. Dead code, TODOs, security, accessibility, naming, unfinished features.
 
 ---
 
-## 1. Dead Code and Unused Assets
+## 1. Dead Code & Unused Files
 
-### 1.1 `src/lib/buyer-service.ts::createPaymentSession`
+### `src/proxy.ts`
+**What it is:** A file at `src/proxy.ts` exists but is not imported anywhere obvious.  
+**Risk:** Could be left-over scaffolding or an incomplete feature.  
+**Action:** Inspect and remove if unused.
 
-**File:** `src/lib/buyer-service.ts` (lines 44-50)  
-**Issue:** This stub function was clearly written for early development. It should have been replaced when `payments-api.ts` was created. It is now the source of the critical checkout bug. Should be deleted entirely.
+### `src/components/admin/.orders-table.tsx.swp`
+**What it is:** A vim swap file (binary). Committed to repository.  
+**Risk:** Looks unprofessional. Bloats repo.  
+**Action:** `git rm src/components/admin/.orders-table.tsx.swp` and add `*.swp` to `.gitignore`.
 
----
+### Footer links all point to `#`
+**Location:** `src/app/page.tsx` — FOOTER_LINKS array  
+**What it is:** Footer columns (Tienda, Vendedores, Ayuda, Legales) render `<a href="#">` links.  
+**Risk:** All footer links are non-functional. Not critical for evaluation but looks incomplete.  
+**Action:** Either link to real routes (`/shop`, etc.) or remove the footer link columns.
 
-### 1.2 `src/services/api/` Directory
-
-**Files:** `src/services/api/addresses.ts`, `cart.ts`, `checkout.ts`, `favorites.ts`, `profile.ts`  
-**Issue:** These files define Axios-based API functions that call the Buyer App's own endpoints. The `hooks/querys/` directory also calls these same endpoints via TanStack Query. Both layers exist in parallel. The `services/api/` layer appears to be a leftover from before the hooks were written, or an intermediary that was never cleaned up.  
-**Impact:** Adds cognitive overhead. A new developer doesn't know which layer to use. Neither breaks anything.
-
----
-
-### 1.3 `@xyflow/react` Dependency
-
-**File:** `package.json`  
-**Issue:** React Flow (`@xyflow/react`) is installed as a dependency but does not appear to be used anywhere in the source. It adds bundle weight.  
-**Action:** `npm uninstall @xyflow/react` if unused.
-
----
-
-### 1.4 `src/proxy.ts`
-
-**File:** `src/proxy.ts` (seen in file listing but not read)  
-**Issue:** A file named `proxy.ts` in `src/` suggests it might be leftover scaffolding or a proxy utility. This should be audited — if unused, delete.
+### `src/generated/prisma/` committed to git
+**What it is:** Entire Prisma generated client including `libquery_engine-darwin-arm64.dylib.node` (10MB macOS binary).  
+**Risk:** The `.gitignore` already has `src/generated/prisma` but the files were previously committed. The macOS binary is dead weight — Vercel generates the correct Linux binary at build time.  
+**Action:** `git rm -r --cached src/generated/prisma/` and commit. The `.gitignore` will prevent re-adding.
 
 ---
 
-### 1.5 `public/` Directory
+## 2. TODO / FIXME Comments
 
-**Files:** `public/file.svg`, `public/globe.svg`, `public/vercel.svg`, `public/window.svg`  
-**Issue:** These are Next.js default template assets. None are used in the application. Dead public assets.
+No explicit `// TODO` or `// FIXME` comments were found in a review of the main source files. This is good. However, several mock functions should have TODOs to signal Etapa 3 work:
 
----
-
-### 1.6 Cart.status = ABANDONED
-
-**File:** `prisma/schema.prisma`  
-**Issue:** `CartStatus` enum includes `ABANDONED` but no code ever sets a cart to this status. Dead schema.
-
----
-
-## 2. TODOs and FIXMEs
-
-No explicit `// TODO` or `// FIXME` comments were found in the reviewed files. However, the mock implementations (stub functions, hardcoded URLs) serve the same purpose implicitly without the marker.
+- `src/lib/buyer-service.ts:createPaymentSession` — should have a TODO for Etapa 3 integration
+- `src/lib/shipping-api.ts` — mock formula should be documented  
+- `src/app/api/v1/buyer/checkout/route.ts` — seller_groups spec deviation should be noted
 
 ---
 
 ## 3. Security Concerns
 
-### 3.1 Price Manipulation via Cart API (HIGH)
+### 3.1 `returnUrl` in checkout not validated against allowlist
+**Location:** `src/app/api/v1/buyer/checkout/route.ts:19`  
+**Issue:** `returnUrl: z.string().url()` accepts any URL. A malicious actor could craft a checkout that redirects to an attacker-controlled domain.  
+**Severity:** Low (the current mock doesn't actually redirect, so this is a future concern for Etapa 3)  
+**Fix:** In Etapa 3, validate `returnUrl` against a whitelist of allowed domains.
 
-**File:** `src/app/api/v1/buyer/cart/route.ts`  
-**Issue:** `unitPriceCents` is accepted from the client without server-side verification. A buyer can create a cart item at any price.  
-**Exploitation:** `POST /api/v1/buyer/cart` with `{ productId: "prd_mock_001", unitPriceCents: 1, ... }`. The Trek Marlin would be in the cart at ARS 0.01.  
-**Fix:** See FIX-04.
+### 3.2 Admin auth relies on `publicMetadata` set in Clerk Dashboard
+**Location:** `src/lib/admin-auth.ts`  
+**Issue:** If a regular user somehow gets `publicMetadata.admin = true` set on their Clerk account (e.g., if Clerk Dashboard access is compromised), they gain full admin access.  
+**Severity:** Acceptable for academic scope — this is the recommended Clerk pattern for admin roles.  
+**Action:** None required for Etapa 2.
 
----
+### 3.3 No rate limiting
+**Issue:** All API endpoints have no rate limiting. A bot could spam `POST /api/v1/buyer/cart` to create thousands of cart items.  
+**Severity:** Not a concern for academic evaluation.
 
-### 3.2 Service Token Returns 500 When Not Configured
+### 3.4 `.env.example` has trailing slash in `PAYMENTS_APP_URL`
+**Location:** `.env.example:22`  
+```
+#PAYMENTS_APP_URL=https://proyecto-c-payments-bicimarket.vercel.app/ 
+```
+**Issue:** Trailing slash + trailing space. URL construction with this base URL will produce double slashes.  
+**Fix:** Remove trailing slash and space.
 
-**File:** `src/lib/service-auth.ts`  
-**Issue:** When an inter-app endpoint's service token env var is not set, `validateServiceToken` returns HTTP 500 with message "La variable de entorno X no está configurada". This leaks configuration state to callers.  
-**Fix:** Return HTTP 503 (Service Unavailable) with a generic message, or return 401 (treat unconfigured token as auth failure).
-
----
-
-### 3.3 returnUrl Accepted from Client
-
-**File:** `src/app/api/v1/buyer/checkout/route.ts`  
-**Issue:** `returnUrl: z.string().url()` accepts any URL from the client. A malicious request could pass a phishing site as the return URL. After checkout, the user would be redirected there.  
-**Fix:** Construct `returnUrl` server-side using `process.env.NEXT_PUBLIC_APP_URL`.
-
----
-
-### 3.4 .env Contains Real Credentials
-
-**File:** `.env`  
-**Issue:** The `.env` file contains active Supabase database credentials (with password) and Clerk API keys. While `.gitignore` excludes it, the README says `cp .env .env.local` which would be a problem in a fresh clone where `.env` doesn't exist (fails silently). If ever accidentally committed, all secrets are exposed.  
-**Status:** Currently safe (`.gitignore` correct), but the README instruction is wrong.
-
----
-
-### 3.5 No Rate Limiting
-
-**Issue:** No rate limiting on any API endpoint. A user could hammer the checkout endpoint repeatedly.  
-**Status:** Acceptable for academic project. Vercel has DDoS protection at the CDN level.
+### 3.5 Service tokens in `.env.example` use descriptive placeholder values
+**Location:** `.env.example`  
+```
+#BUYER_TO_SELLER_SERVICE_TOKEN=token_secreto_para_comunicacion_buyer_seller
+```
+These descriptions as placeholder values are fine for documentation purposes. No actual secrets are exposed.
 
 ---
 
 ## 4. Accessibility Issues
 
-### 4.1 404 Page Typo
+### 4.1 Missing `alt` text verification
+Products displayed via `ProductCard` and `ProductImage` components — need to verify `alt` attributes are populated with meaningful text.  
+**File:** `src/components/shared/product-image.tsx`
 
-**File:** `src/app/not-found.tsx`  
-**Issue:** "La pagina que buscas no existe." — missing accent on "página."
+### 4.2 Icon-only buttons
+Many interactive elements use only icons (e.g., favorite heart button, cart button in ProductCard) without visible text labels. These need `aria-label` attributes.  
+**Files:** `src/components/shop/product-card.tsx`
 
----
+### 4.3 Color contrast in promo banner
+**Location:** `src/app/page.tsx` — PromoBanner section  
+The banner uses `oklch(0.22 0.05 168)` background with white text. While likely fine, the sub-text at `text-white/60` may fail WCAG AA contrast ratio (4.5:1 minimum).
 
-### 4.2 Shop Filter Panel
+### 4.4 Form input labels
+The checkout page address selector and other form inputs need to be checked for proper `<label>` associations. shadcn/ui forms typically include this, but custom components may not.
 
-**File:** `src/components/shop/filter-panel.tsx`  
-**Issue:** Filters likely use slider and button components. Confirm all inputs have associated `<label>` elements and keyboard navigation works.
-
----
-
-### 4.3 No Skip Navigation Link
-
-**Issue:** No `<a href="#main-content">Skip to main content</a>` for keyboard/screen reader users.
-
----
-
-### 4.4 Dynamic Content Without Live Regions
-
-**Issue:** When filters apply and product count changes, screen readers are not notified. The count text `{shopFilters.filtered.length} productos` should have `aria-live="polite"`.
+### 4.5 No `skip to content` link
+Best practice for keyboard navigation is a "skip to main content" link that appears on focus. Not required but worth noting.
 
 ---
 
 ## 5. Inconsistent Naming
 
-### 5.1 camelCase vs snake_case in API Responses
+### 5.1 Route group naming: `(auth)` vs protected auth
+`src/app/(auth)/` — the group is named `(auth)` but contains "protected pages for authenticated buyers" (dashboard, cart, checkout, etc.). The name is misleading — `(auth)` might suggest it's the authentication pages (sign-in/sign-up). Consider renaming to `(protected)` or `(buyer)`.  
+**Severity:** Zero functional impact.
 
-The internal Prisma models use camelCase (`buyerProfileId`, `createdAt`). The API responses from some endpoints return raw Prisma objects with camelCase, while the documentation specifies snake_case (`buyer_profile_id`, `created_at`). Example: `GET /api/v1/buyer/profile` returns the raw Prisma object with camelCase fields, not the documented snake_case shape.
+### 5.2 Mixed camelCase and snake_case in API responses
+User-facing API responses use camelCase (`shippingAddressId`) in the request body, but the spec defines snake_case (`shipping_address_id`).  
+The service-to-service endpoints correctly use snake_case for the body payload.  
+**Severity:** Minor inconsistency for Etapa 3 integration.
 
-**Impact:** Clients (and inter-app consumers) expecting snake_case will break. The admin APIs consume these internally so it's not immediately visible. A professor testing the API with curl will see camelCase vs documented snake_case.
-
----
-
-### 5.2 `Ruta.tsx` Component Name
-
-**File:** `src/components/header/Ruta.tsx`  
-**Issue:** Single-word Spanish component name mixed with English naming convention. Should be `BreadcrumbNav.tsx` or similar.
-
----
-
-### 5.3 Hook Directory Named `querys`
-
-**File:** `src/hooks/querys/`  
-**Issue:** "querys" is not a word — should be "queries". Minor but visible in file tree during defense.
+### 5.3 `MOCK_PRODUCTS` in seller-api.ts uses `price_cents` but seed.ts uses `price`
+Both represent prices in centavos (when large enough) but the different property names and the mismatched values create confusion.  
+**Files:** `prisma/seed.ts`, `src/lib/seller-api.ts`
 
 ---
 
 ## 6. Unfinished Features
 
-### 6.1 Order Status Tabs Not Wired to API Filter
+### 6.1 Checkout returns mock payment URL
+**Location:** `src/lib/buyer-service.ts:45`  
+```typescript
+paymentUrl: `https://example-payment.local/checkout?order=${orderId}`,
+```
+This means clicking "Confirmar compra" in the checkout leads to a browser error page. The order is created correctly in the DB, but the payment redirect is broken.  
+**Impact:** No real end-to-end checkout flow exists. A professor clicking through the UI will hit a dead end.
 
-**File:** `src/hooks/use-order-tabs.ts`  
-**Issue:** The orders page has tabs (Pendientes, En camino, Completadas). If these tabs are client-side filters only (filtering already-fetched orders), that works for small datasets. Server-side filtering by status (`?status=PAID`) would be more scalable. Verify that tab selection doesn't cause a full reload without pagination.
+### 6.2 Order status only advances via service-to-service calls
+Orders created will stay at `PENDING_PAYMENT` forever in the live demo unless someone manually calls `PATCH /api/v1/orders/{id}` with a valid service token. There's no way for a regular user to see an order progress to `PAID` → `SHIPPED` → `DELIVERED` without external tools.  
+**Recommendation:** For the defense, prepare a Postman collection or curl command to simulate Payments App calling back.
+
+### 6.3 Product detail page (`/shop/[productId]`)
+`src/app/shop/[productId]/page.tsx` exists. Need to verify it works correctly with both real Seller App data and mock data.  
+**Action:** Test this page manually.
+
+### 6.4 Profile page
+`src/app/(auth)/profile/page.tsx` exists. The profile editing functionality uses `useProfileMutations` and `PATCH /api/v1/buyer/profile`. Verify this actually persists changes.
+
+### 6.5 Order cancellation
+`POST /api/v1/buyer/orders/{orderId}/cancel` endpoint exists. Verify this is accessible from the UI (not just the API). Check if there's a "Cancelar pedido" button on the order detail page.
 
 ---
 
-### 6.2 Dashboard Stats Are Not Documented
+## 7. Performance Observations
 
-**File:** `src/app/(auth)/dashboard/page.tsx`  
-**Issue:** The buyer dashboard shows "stat cards" from `src/components/dashboard/stat-cards.tsx`. It is unclear what data these cards show. If they hardcode numbers or show unrelated metrics, this is dead UI.
+### 7.1 All products loaded at once
+`GET /api/products` fetches up to 100 products in one request and returns them all to the client. For 12 mock products this is fine. For a real marketplace with hundreds of products, this would be a problem.
+
+### 7.2 No image optimization for product images
+Product images from Wikimedia Commons are served directly. The `next/image` component with `remotePatterns` is configured for Wikimedia, which means lazy loading and WebP optimization should work. Verify `<ProductImage>` uses `next/image` and not a plain `<img>` tag.
+
+### 7.3 Large home page bundle
+`src/app/page.tsx` is ~800 lines with all sections inline. The entire home page is a client component (`"use client"`) which means it's not rendered on the server. This increases the JS bundle size and delays Time To First Byte.
 
 ---
 
-### 6.3 Favorites Don't Show Product Details
+## 8. Missing Tests
 
-**File:** `src/components/favorites/favorite-card.tsx`  
-**Issue:** Favorites store only `productId`. The favorites page must fetch product details from Seller App to display name, price, image. If Seller App is unavailable and the product ID is from the mock, the display may be empty or show placeholder data. Verify favorites can display product info when Seller App is live.
+**There are zero test files in the repository.**
+
+The assignment doesn't explicitly require tests, but for an academic evaluation a professor may ask about testing strategy. The expected answer: "No implementé tests automatizados en esta etapa. Para testear manualmente uso Prisma Studio para verificar la DB, y Postman para los endpoints service-to-service."
 
 ---
 
-## 7. Dependency Concerns
+## 9. OpenAPI Documentation
 
-| Package | Version | Concern |
+`src/app/api/docs/route.ts` and `src/app/api-docs/page.tsx` — an OpenAPI spec and Swagger UI exist. This is a significant bonus that demonstrates professionalism.
+
+**Verify:**
+- The OpenAPI spec at `/api/docs` returns valid JSON/YAML
+- The Swagger UI at `/api-docs` renders correctly
+- The spec documents at least the main buyer endpoints (cart, orders, checkout)
+- The spec includes auth requirements (Bearer token, X-Service-Token)
+
+---
+
+## 10. Final Scorecard (Unofficial Estimate)
+
+| Area | Score (0–10) | Notes |
 |---|---|---|
-| `zod` | `^4.3.6` | v4 is a major breaking release from v3. Syntax changes in schemas. Verify all schemas are v4 compatible. |
-| `lucide-react` | `^1.8.0` | `^1.x` is a major version change from `^0.x` — may have breaking import changes. The custom type declaration at `src/types/lucide-react.d.ts` suggests there was already a compat issue. |
-| `@clerk/nextjs` | `^7.1.0` | v7 is the latest but has changes from v5/v6. Ensure no deprecated APIs are used. |
-| `next` | `16.2.3` | Non-standard version per AGENTS.md — has breaking changes vs standard Next.js 14/15. |
-| `react` | `19.2.4` | React 19 — stable but very new. Some older libraries may not be compatible. |
-| `@base-ui/react` | `^1.4.0` | May conflict with shadcn/radix components. Verify no component conflicts. |
-| `@xyflow/react` | `^12.10.2` | Appears unused — remove. |
+| Next.js pages + components | 9/10 | Comprehensive, well-organized |
+| Own REST API | 8/10 | Good structure, minor spec deviations |
+| PostgreSQL + Prisma | 9/10 | Solid schema, good migrations |
+| Authentication | 6/10 | Works but missing middleware.ts |
+| Admin panel | 7/10 | Functional but no text search |
+| Search + URL params | 6/10 | URL params work, no server pagination |
+| Error handling / 404 | 8/10 | Pages exist, minor typos |
+| Server-side validation | 9/10 | Zod everywhere |
+| Accessibility | 5/10 | Radix UI helps but icon labels missing |
+| External API | 6/10 | Seller App when configured, else mock |
+| Env vars / secrets | 8/10 | Good hygiene, format issue in .env.example |
+| Seed data | 5/10 | Only 2 orders/user, price inconsistency |
+| README | 5/10 | Email format wrong (CRITICAL) |
+| **Overall** | **~7/10** | Good foundation, several fixable gaps |
 
----
-
-## 8. Testing
-
-**Status:** NO TESTS EXIST
-
-There are no test files anywhere in the repository (`*.test.ts`, `*.spec.ts`, `*.test.tsx`, `*.spec.tsx`). No `jest.config.js`, `vitest.config.ts`, or testing library setup found.
-
-**Impact:** Cannot verify API behavior without manual testing. Regressions from fixes will not be caught automatically.
-
-**Recommendation:** Even adding 2-3 unit tests for critical functions (`calculateCartTotals`, `groupItemsBySeller`, `validateServiceToken`) would demonstrate awareness of testing. For an academic project, this is low priority but worth noting.
-
----
-
-## 9. Observations on Mock Architecture
-
-The mock strategy is well-designed:
-- `seller-api.ts`, `shipping-api.ts`, `payments-api.ts` all check for env var presence and fall back to mocks transparently
-- This allows the app to function as a standalone demo without the other 3 apps
-
-However, the mock strategy is undermined by:
-1. `createPaymentSession` — is always mock, bypasses the conditional check in `payments-api.ts`
-2. Missing service tokens — incoming endpoints fail with 500 instead of falling back gracefully
-3. The mock shipping response structure doesn't match what the real Shipping App would return (per the API contract), potentially requiring interface changes when connecting for real
-
----
-
-## 10. Code Quality Observations
-
-**Positive:**
-- Clean, readable TypeScript throughout
-- Consistent use of async/await
-- Good use of `Promise.all` for parallel operations in checkout and data fetching
-- Zod schemas co-located with handlers for readability
-- `getOrCreateBuyerProfile` is a clean single-responsibility function
-- Service clients are thin and testable
-
-**Negative:**
-- `checkout/route.ts` is 176 lines and handles too many concerns (validation, shipping, order creation, group creation, item creation, history, cart clearing, payment) — should be decomposed
-- No JSDoc on public service functions (acceptable per project guidelines)
-- Comments in some files explain WHAT the code does rather than WHY (e.g., `// PATCH /api/v1/buyer/profile` repeats the route)
-
----
-
-## 11. API Documentation (Swagger/OpenAPI)
-
-**File:** `src/app/api/docs/route.ts`, `src/app/api-docs/page.tsx`, `src/lib/openapi.ts`
-
-**Status:** Present ✅
-
-The app serves an OpenAPI spec at `/api/docs` and a Swagger UI at `/api-docs`. This is a significant bonus — few students implement API documentation. Verify that the OpenAPI spec accurately reflects the implemented endpoints (it may be auto-generated or manually maintained).
-
-**Recommendation:** Mention the API docs page in the README and defense presentation.
-
----
-
-## 12. Summary Scorecard
-
-| Area | Score | Notes |
-|---|---|---|
-| Functionality | 6/10 | Checkout broken; most features work |
-| Code Quality | 8/10 | Clean, readable, well-organized |
-| Spec Compliance | 6/10 | Multiple documented deviations |
-| Security | 5/10 | Price manipulation; service token leakage |
-| Testing | 0/10 | No tests |
-| Documentation | 8/10 | README good; Swagger UI present |
-| Deployment | 7/10 | Live on Vercel; missing tokens |
-| Architecture | 7/10 | Good separation; checkout coupling bug |
-| Accessibility | 5/10 | shadcn helps; no auditing done |
-| Admin Panel | 8/10 | Present and functional |
-| **Overall** | **6.5/10** | **Strong foundation, critical bugs to fix** |
+The overall quality is **above average** for an academic project. The code is clean, the architecture is thoughtful, and the documentation is thorough. The main risks are fixable in a few hours of focused work:
+1. User emails (30 min)
+2. Clerk middleware (15 min)  
+3. Seed data expansion (1 hour)
+4. Production SELLER_APP_URL verification (10 min)

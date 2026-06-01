@@ -35,7 +35,19 @@ function toProduct(p: SellerProduct): Product {
 }
 
 // GET /api/products — catálogo de productos (proxied desde Seller App)
-export async function GET() {
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const page = Math.max(1, Number(url.searchParams.get("page") ?? 1));
+  const limit = 20;
+
   const { data } = await getSellerProducts({ status: "active" });
-  return NextResponse.json(data.map(toProduct));
+  const products = data.map(toProduct);
+  const total = products.length;
+  const start = (page - 1) * limit;
+  const paged = products.slice(start, start + limit);
+
+  return NextResponse.json({
+    data: paged,
+    pagination: { total, page, limit, has_more: start + limit < total },
+  });
 }

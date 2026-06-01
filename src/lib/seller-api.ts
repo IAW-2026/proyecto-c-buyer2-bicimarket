@@ -41,9 +41,7 @@ export async function getSellerProducts(
       { params: { status: "active", limit: 100, ...params } },
     );
     return data;
-  } catch (err) {
-    console.error("Error fetching products from Seller App, returning mock data");
-    console.error("Error details:", err);
+  } catch {
     return {
       data: MOCK_PRODUCTS,
       pagination: { total: MOCK_PRODUCTS.length, page: 1, limit: 20, has_more: false },

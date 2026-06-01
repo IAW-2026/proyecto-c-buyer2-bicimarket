@@ -4,197 +4,209 @@
 
 ## 1. Folder Structure
 
-### Assessment: GOOD
-
 ```
 src/
-├── app/              # Next.js App Router (pages + API routes)
-│   ├── (auth)/       # Protected buyer pages (layout redirects)
-│   ├── admin/        # Admin pages (layout checks admin flag)
-│   ├── api/
-│   │   ├── v1/       # Versioned API (correct)
-│   │   │   ├── buyer/    # UI-facing endpoints
-│   │   │   └── orders/   # Inter-app endpoints
-│   │   ├── admin/    # Admin REST APIs (not under v1 — see issue below)
-│   │   ├── products/ # Proxy to Seller App (not under v1 — issue)
-│   │   ├── docs/     # OpenAPI spec route
-│   │   └── health/   # Health check
-│   ├── shop/         # Catalog
-│   ├── sign-in/
-│   └── sign-up/
-├── components/       # UI components by domain
-├── hooks/            # React Query hooks and custom hooks
-│   └── querys/       # Mutation hooks organized by domain
-├── lib/              # Business logic and service clients
-├── providers/        # React context providers
-├── services/api/     # API function modules (partially redundant with hooks)
-├── store/            # Zustand stores
-└── types/            # TypeScript type definitions
+  app/               # Next.js App Router pages + API routes
+    (auth)/          # Protected user pages (cart, checkout, orders, profile, favorites, dashboard)
+    admin/           # Admin panel pages (protected by requireAdmin)
+    api/
+      v1/buyer/      # User-facing API (Clerk JWT)
+      v1/orders/     # Service-to-service API (X-Service-Token)
+      admin/         # Admin API (admin Clerk JWT)
+      products/      # Catalog proxy (no auth — public)
+      docs/          # OpenAPI spec
+    shop/            # Public catalog + product detail
+    sign-in/ sign-up/ # Clerk auth pages
+    api-docs/        # Swagger UI
+  components/        # React components by domain
+    admin/ buyer/ cart/ checkout/ dashboard/
+    favorites/ header/ layout/ orders/ profile/ shared/ shop/ ui/
+  hooks/             # TanStack React Query hooks
+    querys/          # Mutation hooks (addresses, cart, checkout, favorites, profile)
+    use-buyer.ts     # All query hooks
+  lib/               # Business logic + external clients
+  providers/         # QueryProvider
+  services/api/      # Axios service functions (addresses, cart, checkout, favorites, profile)
+  store/             # Zustand (cart checkout UI state only)
+  types/             # TypeScript types
+  generated/prisma/  # Generated Prisma client (should not be committed)
+prisma/
+  schema.prisma
+  seed.ts
+  migrations/
 ```
 
-### Issues
+### Assessment
+**Good.** Domain-organized folders, clear separation between pages, components, hooks, and service layer. Route groups used correctly.
 
-**Severity: MINOR** — Admin API routes (`/api/admin/...`) are not under `/api/v1/`. This deviates from the global rule that all API routes live under `/api/v1/...`.
-
-**Severity: MINOR** — Product proxy routes (`/api/products/`, `/api/products/[productId]`) are not under `/api/v1/`. They exist alongside versioned routes.
-
-**Severity: MINOR** — `src/services/api/` and `src/hooks/querys/` have partial overlap in responsibility (both deal with API calls), creating confusion about where to put new functionality.
+**Issues:**
+- `src/generated/prisma/` is committed to the repository (including a 10MB+ `.dylib.node` binary). This should be generated at build time, not committed. *(Severity: Medium)*
+- `src/components/admin/.orders-table.tsx.swp` — vim swap file committed to repo. *(Severity: Minor)*
+- `src/proxy.ts` — exists but unclear purpose (not referenced in obvious places). *(Severity: Minor)*
 
 ---
 
 ## 2. Separation of Concerns
 
-### Assessment: GOOD
+### Assessment: Good overall, minor violations
 
-- API routes handle HTTP concerns; business logic delegated to `lib/`
-- `buyer-service.ts` contains pure domain functions (`getOrCreateBuyerProfile`, `calculateCartTotals`, `groupItemsBySeller`)
-- Service clients (`seller-api.ts`, `shipping-api.ts`, `payments-api.ts`) are thin HTTP wrappers with mock fallback
-- Prisma singleton in `lib/prisma.ts` prevents multiple client instances
+**Good patterns:**
+- Service layer: `src/lib/buyer-service.ts` contains business logic separate from API handlers
+- External service clients: `src/lib/seller-api.ts`, `payments-api.ts`, `shipping-api.ts` — each encapsulates one integration
+- Auth utilities: `src/lib/admin-auth.ts`, `src/lib/service-auth.ts` separate auth logic
+- State management: Zustand only for ephemeral UI state (checkout address, notes); server state via React Query
 
-### Issues
-
-**Severity: IMPORTANT** — `buyer-service.ts` also contains `createPaymentSession` which is a **hardcoded stub** that has no business being in the service layer. It creates a false impression that payment integration is working. This function should either call `payments-api.ts::createPayment` or be removed. Its presence in `buyer-service.ts` caused a critical routing bug where checkout never calls the real Payments App.
-
-**Severity: MINOR** — `src/services/api/` (addresses.ts, cart.ts, checkout.ts, favorites.ts, profile.ts) contains Axios API call functions targeting the Buyer App's own API. These are nearly identical in purpose to what `hooks/querys/` does, creating dual paths for the same data. The `hooks/` approach using TanStack Query is the modern pattern; the `services/api/` layer adds complexity without clear benefit.
+**Violations:**
+- `src/app/page.tsx` (home) is a huge client component (~800 lines) with business logic inline. Should be split into sub-components + moved logic to hooks. *(Severity: Minor)*
+- `src/app/api/products/route.ts` is a "proxy" route that doesn't live under `/v1/` — it's a UI-specific endpoint not documented in the inter-service contract. *(Severity: Minor)*
+- Two parallel data-fetching abstractions: `src/hooks/use-buyer.ts` (React Query hooks using axios) AND `src/services/api/` (raw axios functions). The hook layer calls the service layer, which is correct, but adds a layer of indirection that could be simplified. *(Severity: Minor)*
 
 ---
 
 ## 3. API Design
 
-### Assessment: GOOD (with deviations)
+### Assessment: Good, with spec deviations
 
-- Consistent error format `{ error: { code, message, details } }` across most routes
-- HTTP verbs used correctly (GET/POST/PATCH/DELETE)
-- Zod validation on all inputs
-- Auth checked first in every handler
+**Good:**
+- Versioned under `/api/v1/`
+- Consistent error format: `{ error: { code, message, details } }`
+- Zod validation at every boundary
+- Separation of user-facing (`/buyer/`) from service-to-service (`/orders/`) namespaces
+- OpenAPI docs generated and served at `/api-docs`
 
-### Issues
-
-**Severity: CRITICAL** — `POST /api/v1/buyer/cart` accepts the product snapshot from the client:
-```ts
-unitPriceCents: z.number().int().nonnegative(),
-weightGramsSnapshot: z.number().int().nonnegative(),
-```
-A buyer can send `unitPriceCents: 1` and create a cart item for any product at ARS 0.01. This is a price manipulation vulnerability. The spec says the server must call Seller App to resolve these values.
-
-**Severity: IMPORTANT** — `POST /api/v1/buyer/checkout` accepts `returnUrl` from the client instead of constructing it server-side. A malicious client could pass a `returnUrl` pointing to an external phishing site. Also, `seller_groups` with `shipping_quote_id` are not in the request body — the spec requires these.
-
-**Severity: IMPORTANT** — Checkout hardcodes `shippingCostCents: 0` for each `OrderSellerGroup`:
-```ts
-shippingCostCents: 0,  // line 132 in checkout/route.ts
-```
-While `shippingTotalCents` is calculated correctly at the order level, each seller group shows zero shipping cost. This is incorrect and will mislead downstream apps.
-
-**Severity: MINOR** — No `Idempotency-Key` check on checkout (spec requires it). A double-click could create two orders.
-
-**Severity: MINOR** — `GET /api/v1/buyer/orders/{orderId}` is implemented but the API table in the README lists it as `GET /api/v1/buyer/orders/[id]`. Confirm route `src/app/api/v1/buyer/orders/[orderId]/route.ts` responds correctly — it does exist.
-
-**Severity: MINOR** — Admin API error format inconsistent:
-```ts
-// admin-auth.ts line 13
-return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-// vs everywhere else:
-return NextResponse.json({ error: { code: "UNAUTHORIZED", message: "...", details: {} } }, { status: 401 });
-```
+**Issues:**
+- `GET /api/products` is not under `/api/v1/` — this is an internal proxy route used by the frontend, not a documented public API. If a professor navigates to `/api/products` they'll see raw JSON without auth. This is fine but could be confusing. *(Severity: Minor)*
+- Checkout endpoint at `/api/v1/buyer/checkout` (POST) accepts `{shippingAddressId, notes, returnUrl}` — the spec defines the request as `{shipping_address_id, seller_groups: [{seller_profile_id, shipping_quote_id}], notes}`. The `seller_groups` parameter is missing from the actual implementation. *(Severity: Important — see 04-spec-deviations.md)*
+- No `Idempotency-Key` header support on the checkout endpoint, despite the spec requiring it on all POSTs that create resources. *(Severity: Minor)*
+- Checkout response returns `{paymentUrl, orderId}` instead of the full order object defined in spec. *(Severity: Minor)*
 
 ---
 
 ## 4. Database Design
 
-### Assessment: GOOD (with minor deviations)
+### Assessment: Excellent
 
-- All required tables present and correctly related
-- Proper use of nullable (`?`) for optional foreign refs to other apps
-- `@@unique` constraints on `(cartId, productId)` and `(buyerProfileId, productId)` — correct
-- `@@unique([orderId, sellerProfileId])` on `OrderSellerGroup` — correct
-- Audit table `OrderStatusHistory` — present and populated
-- Soft delete on `BuyerProfile` (`deletedAt`) — present
-- Cascade delete on `Address` when `BuyerProfile` deleted — present
+**Good:**
+- All models present and correctly structured per spec
+- Snapshots correctly implemented (`productNameSnapshot`, `unitPriceCents`, `weightGramsSnapshot`, `shippingAddressSnapshot` as JSON)
+- Cross-app references stored as opaque strings (no FK violations)
+- Unique constraints correct: `(cartId, productId)`, `(buyerProfileId, productId)`, `(orderId, sellerProfileId)`
+- Cascade deletes on Address when BuyerProfile is deleted
+- OrderStatusHistory for audit trail
 
-### Issues
-
-**Severity: MINOR** — IDs are generated as bare CUIDs without the resource prefix (`ord_`, `byp_`, etc.) that the documentation mandates. Example: order IDs will be `clxyz123...` instead of `ord_clxyz123...`. This makes log parsing and debugging harder.
-
-**Severity: MINOR** — `OrderStatusHistory` is used for both order-level and seller-group-level status changes (via `source: "seller"` in the seller-group update route). This mixes two different entity types in one audit table. A separate `OrderSellerGroupStatusHistory` would be cleaner.
-
-**Severity: MINOR** — `CartItem` does not have `deleted_at` — if needed to audit removed items this is a gap (acceptable for this scope).
-
-**Severity: INFO** — Only 2 migrations despite likely multiple schema iterations. This suggests `db push` was used predominantly over `migrate dev`. For an academic project this is acceptable but worth noting.
+**Issues:**
+- No `OrderSellerGroupStatusHistory` — spec says seller_group status transitions should also be audited. *(Severity: Minor)*
+- `BuyerProfile.deletedAt` exists but is not used in any query (soft deletes not actually soft — no `where: { deletedAt: null }` in queries). *(Severity: Minor)*
+- Prisma client generated to `src/generated/prisma/` — unusual path, non-default. Works but is non-standard. *(Severity: Minor)*
+- The `libquery_engine-darwin-arm64.dylib.node` (macOS ARM binary) is committed. This will fail on Linux (Vercel). The build script `prisma generate && next build` handles this at build time, so it works, but the committed binary is dead weight and bloats the repo. *(Severity: Medium)*
 
 ---
 
 ## 5. Domain Modeling
 
-### Assessment: GOOD
+### Assessment: Excellent match with spec
 
-- Domain boundaries are well respected: no cross-app FKs in schema
-- Snapshots stored at time of transaction (`productNameSnapshot`, `unitPriceCents` in cart_items and order_items)
-- `shippingAddressSnapshot` stored as JSON in orders — correct
-- `orderStatusHistory` captures source and payload — correct
+The Prisma schema closely mirrors the spec in `documentacion/04-modelo-de-datos.md`:
 
-### Issues
+| Spec Model | Schema Model | Match |
+|---|---|---|
+| `buyer_profiles` | `BuyerProfile` | ✅ |
+| `addresses` | `Address` | ✅ |
+| `carts` | `Cart` | ✅ |
+| `cart_items` | `CartItem` | ✅ |
+| `favorite_items` | `FavoriteItem` | ✅ |
+| `orders` | `Order` | ✅ |
+| `order_seller_groups` | `OrderSellerGroup` | ✅ |
+| `order_items` | `OrderItem` | ✅ |
+| `order_status_history` | `OrderStatusHistory` | ✅ |
 
-**Severity: MINOR** — `Cart.status` enum includes `ABANDONED` but there is no code to mark carts as abandoned. This is dead schema that could confuse a reviewer.
+All enums match: `CartStatus`, `OrderStatus`, `SellerGroupStatus`, `ShippingStatus`.
+
+**Difference:** Spec mentions a `Role` enum (USER/ADMIN) but it's not in the schema. Role is managed via Clerk `publicMetadata` instead, which is a legitimate design decision.
 
 ---
 
 ## 6. Reusability
 
-### Assessment: GOOD
+### Assessment: Good
 
-- `PaginationControls` — generic and reusable
-- `EmptyState` — generic (icon, title, description props)
-- `StatusBadge` — generic status-to-color component
-- `PriceDisplay` — reusable currency formatter
-- `ProductImage` — image with fallback
+**Good:**
+- `src/components/shared/` houses truly reusable components (EmptyState, PaginationControls, StatusBadge, PriceDisplay, ProductImage)
+- `src/components/ui/` — 59 shadcn/ui components, all primitive and reusable
+- `src/lib/entity-ids.ts` — centralized ID generation with prefixes
+- `src/lib/service-auth.ts` — `validateServiceToken()` reused across all service-to-service routes
+- `src/lib/service-client.ts` — reusable Axios client factory for inter-service calls
 
-### Issues
-
-**Severity: MINOR** — `useApiMutation.tsx` in `hooks/querys/common/` exists but may not be used consistently across all mutation hooks. Some mutations are defined inline in components.
+**Issues:**
+- `src/app/page.tsx` duplicates product card + cart interaction logic that is also in `src/app/shop/page.tsx`. The `handleAddToCart` and `handleToggleFavorite` functions are copy-pasted between the two files. *(Severity: Minor)*
+- `src/hooks/use-buyer.ts` exports a long flat list of hooks — could be split by domain (useCart, useFavorites, useOrders) for better discoverability. *(Severity: Minor — no functional impact)*
 
 ---
 
 ## 7. Coupling
 
-### Assessment: ACCEPTABLE
+### Assessment: Well decoupled by design
 
-- Inter-app coupling is contained in `lib/seller-api.ts`, `lib/shipping-api.ts`, `lib/payments-api.ts` — good boundary
-- Mock fallbacks isolate the rest of the app from unavailable services
-- `service-client.ts` is a single factory for all outbound service calls
+**Good:**
+- External services (Seller App, Shipping App, Payments App) accessed only through dedicated client modules with graceful fallback
+- Zustand store only holds UI state — no server data in global state
+- React Query cache is the single source of truth for server data
+- API routes don't call each other — they're independently callable
 
-### Issues
-
-**Severity: IMPORTANT** — The checkout route imports from both `lib/buyer-service.ts` AND `lib/shipping-api.ts` but then calls `buyer-service.ts::createPaymentSession` (wrong function) instead of `lib/payments-api.ts::createPayment` (correct function). This tight coupling of the wrong function creates the critical payment bug.
-
----
-
-## 8. Scalability
-
-### Assessment: POOR for shop browsing, ACCEPTABLE for everything else
-
-- API routes are serverless-compatible (Next.js API routes on Vercel)
-- Prisma with connection pooling via Supabase pgBouncer — correct setup
-- Individual buyer operations (cart, orders, addresses) are indexed and fast
-
-### Issues
-
-**Severity: IMPORTANT** — Shop page loads ALL products in one request with no server-side pagination. With a real seller catalog of hundreds of products, this creates a large response payload, slow initial load, and a memory-intensive client-side filter. The architecture needs server-side filtering and pagination before a real product set is connected.
+**Issues:**
+- `src/lib/buyer-service.ts` imports `currentUser` from `@clerk/nextjs/server` — this ties the service layer to the HTTP request context. The function `getOrCreateBuyerProfile` is not pure. *(Severity: Minor)*
+- `src/lib/seller-api.ts` has `MOCK_PRODUCTS` hardcoded inline — mock data is coupled to the production client. A better design would have the mock in a separate file or use a different pattern. *(Severity: Minor)*
+- Seed (`prisma/seed.ts`) imports from the same `MOCK_PRODUCTS` concept but with different prices — loose coupling that has caused a data inconsistency bug. *(Severity: Medium — see below)*
 
 ---
 
-## 9. Technical Debt
+## 8. Critical Bug: Price Inconsistency Between Seed and Mock Data
 
-| Item | File | Severity | Notes |
-|---|---|---|---|
-| `createPaymentSession` stub | `buyer-service.ts:44-50` | CRITICAL | Blocks real payment flow |
-| Price from client in cart | `cart/route.ts:7-15` | IMPORTANT | Security vulnerability |
-| No middleware.ts | (missing) | IMPORTANT | Clerk protection gap |
-| `shippingCostCents: 0` per group | `checkout/route.ts:132` | IMPORTANT | Data incorrect |
-| Vim swap file committed | `.orders-table.tsx.swp` | MINOR | Clutter |
-| Non-v1 admin/products routes | `api/admin/`, `api/products/` | MINOR | Spec deviation |
-| Bare CUID IDs (no prefix) | `schema.prisma` | MINOR | Spec deviation |
-| Price inconsistency in seed | `seed.ts` | MINOR | Confusing demo data |
-| No retry logic | `service-client.ts` | MINOR | Spec deviation |
-| No X-Request-Id propagation | `service-client.ts` | MINOR | Spec deviation |
-| Dead `ABANDONED` cart status | `schema.prisma` | MINOR | Dead code |
-| Duplicate service layer | `services/api/` vs `hooks/querys/` | MINOR | Redundant abstraction |
+**Severity: HIGH**
+
+`prisma/seed.ts` uses:
+```typescript
+{ id: "prd_mock_001", name: "Bicicleta de montaña Trek Marlin 5", price: 450000, ... }
+```
+
+`src/lib/seller-api.ts` uses:
+```typescript
+{ id: "prd_mock_001", title: "Bicicleta de montaña Trek Marlin 5", price_cents: 130000000, ... }
+```
+
+The same product (same `id`) has `price: 450000` in the seed (ARS $4,500) vs `price_cents: 130000000` (ARS $1,300,000) in the mock product list. These are dramatically different values.
+
+A seeded cart will show $4,500 for the Trek Marlin, but adding it fresh to a cart from the shop will show $1,300,000. This inconsistency is immediately visible to an evaluator comparing cart totals with order history.
+
+**Fix:** Align prices between seed.ts and MOCK_PRODUCTS in seller-api.ts.
+
+---
+
+## 9. Scalability
+
+### Assessment: Not a concern for academic scope, but worth noting
+
+**Issues:**
+- `GET /api/products` fetches ALL products (`limit: 100`) in one call. For the academic use case with ~12 mock products this is fine, but would fail at scale. *(Severity: Minor for now)*
+- Client-side filtering in the shop means all products are transferred to the browser before any filtering happens. *(Severity: Minor)*
+- No caching layer (Redis, etc.) for Seller App responses — a short TTL cache is called for in the spec. *(Severity: Minor)*
+- No rate limiting on any endpoint. *(Severity: Minor)*
+
+---
+
+## 10. Technical Debt
+
+### Summary
+
+| Issue | Severity | File |
+|---|---|---|
+| Missing `src/middleware.ts` for Clerk | High | — |
+| No server-side pagination in shop | High | `src/app/api/products/route.ts`, `src/app/shop/page.tsx` |
+| Price inconsistency seed vs mock | High | `prisma/seed.ts`, `src/lib/seller-api.ts` |
+| `createPaymentSession` is fully mocked | Medium | `src/lib/buyer-service.ts` |
+| Generated Prisma binary committed | Medium | `src/generated/prisma/` |
+| Vim swap file committed | Low | `src/components/admin/.orders-table.tsx.swp` |
+| Home page too large (~800 LOC) | Low | `src/app/page.tsx` |
+| Duplicate cart/favorite logic | Low | `src/app/page.tsx`, `src/app/shop/page.tsx` |
+| No SellerGroupStatusHistory | Low | `prisma/schema.prisma` |
+| Footer links all point to `#` | Low | `src/app/page.tsx` |

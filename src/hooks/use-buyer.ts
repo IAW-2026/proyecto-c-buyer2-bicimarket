@@ -102,11 +102,13 @@ export function useBuyerOrder(orderId: string) {
 
 // ─── Productos (público) ──────────────────────────────────────────────────────
 
-export function useProducts() {
-  return useQuery<Product[]>({
-    queryKey: ["products"],
+export function useProducts(page = 1) {
+  return useQuery<{ data: Product[]; pagination: PaginationMeta }>({
+    queryKey: ["products", page],
     queryFn: async () => {
-      const { data } = await api.get<Product[]>("/products");
+      const { data } = await api.get<{ data: Product[]; pagination: PaginationMeta }>(
+        `/products?page=${page}&limit=20`,
+      );
       return data;
     },
   });
