@@ -62,7 +62,7 @@ function ShopContent() {
   return (
     <div className="flex min-h-full flex-col lg:flex-row">
       {/* Filter panel */}
-      <aside className="w-full border-b border-border/60 px-6 py-5 lg:w-60 lg:shrink-0 lg:border-b-0 lg:border-r lg:py-8">
+      <aside className="w-full border-b border-border/60 px-6 py-5 lg:sticky lg:top-[52px] lg:self-start lg:max-h-[calc(100vh-52px)] lg:overflow-y-auto lg:w-60 lg:shrink-0 lg:border-b-0 lg:border-r lg:py-8">
         <div className="flex items-center gap-2 mb-4">
           <SlidersHorizontal className="size-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold">Filtros</h2>

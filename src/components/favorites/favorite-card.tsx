@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { Heart, ExternalLink } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { PriceDisplay } from "@/components/shared/price-display";
+import { cn } from "@/lib/utils";
 import type { FavoriteItem, Product } from "@/types/buyer";
 
 type FavoriteCardProps = {
@@ -47,15 +49,13 @@ export function FavoriteCard({
       </div>
 
       <div className="flex flex-col gap-2 px-4 pb-4">
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full gap-1.5 text-xs"
-          render={<a href={`/shop?product=${item.productId}`} />}
+        <Link
+          href={`/shop/${item.productId}`}
+          className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full gap-1.5 text-xs")}
         >
           <ExternalLink className="size-3.5" />
           Ver producto
-        </Button>
+        </Link>
         <Button
           variant="ghost"
           size="sm"

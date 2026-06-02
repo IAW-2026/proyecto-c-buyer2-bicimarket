@@ -652,8 +652,13 @@ function SellersSection({
           viewport={{ once: true }}
         >
           {sellers.length > 0
-            ? sellers.map((seller) => (
-                <motion.div key={seller.id} variants={fadeUp}>
+            ? sellers.map((seller, i) => (
+                <motion.div
+                  key={seller.id}
+                  initial={{ opacity: 0, y: 24 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: i * 0.1 }}
+                >
                   <SellerCard name={seller.name} count={seller.count} />
                 </motion.div>
               ))
@@ -691,10 +696,7 @@ function SellerCard({ name, count }: { name: string; count: number }) {
           <p className="text-xs text-muted-foreground">{count} productos</p>
         )}
       </div>
-      <div className="flex items-center gap-0.5">
-        <Star className="size-3.5 fill-amber-400 text-amber-400" />
-        <span className="text-xs font-medium">4.9</span>
-      </div>
+      <Star className="size-3.5 fill-amber-400 text-amber-400" />
     </Link>
   );
 }
