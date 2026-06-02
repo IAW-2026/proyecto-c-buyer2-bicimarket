@@ -27,7 +27,7 @@ function toProduct(p: SellerProduct): Product {
     weightGrams: p.weight_grams,
     imageUrl: p.main_image_url,
     sellerId: p.seller_profile_id,
-    sellerName: p.seller_name ?? p.seller_profile_id,
+    sellerName: p.seller_display_name ?? p.seller_name ?? null,
     category: SELLER_TO_BUYER_CATEGORY[p.category] ?? null,
     isActive: p.status === "active",
     createdAt: p.created_at,

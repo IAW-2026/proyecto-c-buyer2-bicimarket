@@ -256,7 +256,7 @@ function HeroSection({ productCount, sellerCount }: { productCount?: number; sel
 
         <motion.div variants={fadeUp} className="flex items-center gap-8 border-t border-border/60 pt-6">
           {[
-            { value: sellerCount ? `+${sellerCount}` : "10", label: "Bicicleterías vendiendo" },
+            { value: "1 ", label: "Año de garantía en bicicletas" },
             { value: "24 h", label: "Soporte para tu compra" },
             { value: "365", label: "Dias pedaleando con respaldo" },
           ].map((stat) => (

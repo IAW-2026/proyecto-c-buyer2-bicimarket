@@ -21,6 +21,7 @@ export type SellerProduct = {
   weight_grams: number;
   dimensions_cm?: { length: number; width: number; height: number };
   seller_profile_id: string;
+  seller_display_name?: string;
   seller_name?: string;
   main_image_url: string | null;
   status: "active" | "draft" | "inactive";
