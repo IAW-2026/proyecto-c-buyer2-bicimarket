@@ -12,9 +12,9 @@ https://proyecto-c-buyer2-bicimarket.vercel.app/
 
 | Nombre | Email | Contraseña | Rol |
 |--------|-------|------------|-----|
-| buyer admin | buyerclerktest@iaw.com | iawuser# | Admin (acceso a `/admin`) |
-| buyer1 operator | buyer1clerktest@iaw.com | iawuser# | Comprador |
-| buyer2 operator | buyer2clerktest@iaw.com | iawuser# | Comprador |
+| buyer admin | buyerclerk_test@iaw.com | iawuser# | Admin (acceso a `/admin`) |
+| buyer1 operator | buyer1clerk_test@iaw.com | iawuser# | Comprador |
+| buyer2 operator | buyer2clerk_test@iaw.com | iawuser# | Comprador |
 
 > El usuario `buyer admin` tiene `{ "admin": true }` en su `publicMetadata` de Clerk, lo que habilita el acceso al panel de administración.
 
