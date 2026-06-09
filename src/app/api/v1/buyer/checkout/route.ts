@@ -171,10 +171,7 @@ export async function POST(request: NextRequest) {
       },
     }),
     prisma.cartItem.deleteMany({ where: { cartId: cart.id } }),
-    prisma.cart.update({
-      where: { id: cart.id },
-      data: { status: "CONVERTED" },
-    }),
+    prisma.cart.update({ where: { id: cart.id }, data: { status: "CONVERTED" } }),
   ]);
 
   const payment = await createPaymentSession(order.id, totalCents);

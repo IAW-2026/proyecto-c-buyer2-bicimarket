@@ -51,7 +51,7 @@ export function StatsOverview() {
       label: "Carritos activos",
       value: stats ? (stats.cartsByStatus["ACTIVE"] ?? 0).toLocaleString("es-AR") : null,
       icon: ShoppingCart,
-      sub: `${stats?.cartsByStatus["ABANDONED"] ?? 0} abandonados`,
+      sub: `${stats?.cartsByStatus["CONVERTED"] ?? 0} convertidos`,
     },
     {
       label: "Órdenes últimas 24h",

@@ -17,13 +17,11 @@ type CartRow = {
 const STATUS_LABELS: Record<CartStatus, string> = {
   ACTIVE: "Activo",
   CONVERTED: "Convertido",
-  ABANDONED: "Abandonado",
 };
 
-const STATUS_VARIANT: Record<CartStatus, "default" | "secondary" | "outline"> = {
+const STATUS_VARIANT: Record<CartStatus, "default" | "secondary"> = {
   ACTIVE: "default",
   CONVERTED: "secondary",
-  ABANDONED: "outline",
 };
 
 const fmt = (cents: number) =>

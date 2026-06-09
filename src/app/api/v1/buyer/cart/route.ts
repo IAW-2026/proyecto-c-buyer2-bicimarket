@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
   const cart = await prisma.cart.upsert({
     where: { buyerProfileId: profile.id },
     create: { id: createCartId(), buyerProfileId: profile.id },
-    update: {},
+    update: { status: "ACTIVE" },
   });
 
   const isNew = !(await prisma.cartItem.findFirst({
