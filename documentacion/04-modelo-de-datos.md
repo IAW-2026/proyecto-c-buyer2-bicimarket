@@ -52,7 +52,7 @@ Fuente de verdad de: `order_id`, carrito, direcciones del comprador, perfil de c
 |---|---|---|
 | `id` | string PK | `crt_…` |
 | `buyer_profile_id` | string FK unique | un cart activo por buyer |
-| `status` | enum `active` \| `converted` \| `abandoned` | |
+| `status` | enum `active` \| `converted` | |
 | `created_at` / `updated_at` | timestamps | |
 
 #### `cart_items`
@@ -566,3 +566,35 @@ pending ─► paid (terminal)
 | Comisión y net del settlement | Payments (verdad) | **Payments App** | Seller solo lee. |
 
 ---
+
+## Apéndice: Diferencias con documentacion-vieja
+
+### 1. Regla de identidad en §0 (Reglas comunes a todas las DB)
+
+Este es el cambio más importante del archivo.
+
+- **Vieja**: "cada app tiene su propio Clerk. `clerk_user_id` en cada perfil refiere al Clerk **de esa app**. No existe correlación entre Clerks: si un humano opera en varias apps, sus cuentas son independientes."
+- **Actual**: "todas las apps comparten el mismo proyecto de Clerk. El `clerk_user_id` es el mismo para un usuario dado sin importar en qué app lo lea."
+
+**Por qué**: consecuencia directa de la decisión de unificar el proyecto de Clerk (documentada en `01-descripcion.md`). Con un Clerk compartido, el mismo `clerk_user_id` identifica al usuario en todas las DBs, lo que simplifica queries cruzados y el provisioning de perfiles locales.
+
+### 2. `carts.status`: eliminación del valor `abandoned`
+
+- **Vieja**: `enum active | converted | abandoned`
+- **Actual**: `enum active | converted`
+
+**Por qué**: detectar un carrito abandonado requiere un mecanismo de trigger asincrónico: o bien un cron job que evalúe carritos inactivos pasado cierto TTL, o bien un webhook de sesión/actividad que notifique cuando el usuario abandona el flujo. El sistema no expone webhooks entre sus propias apps (el único webhook del sistema es el de Mercado Pago → Payments App), y agregar un cron con esa responsabilidad estaba fuera del alcance del proyecto. Sin un mecanismo que transite el carrito a `abandoned`, el estado era dead code documental. Se eliminó para que el esquema refleje solo los estados que el sistema efectivamente maneja.
+
+### 3. `products.category`: agregado de `indumentaria`
+
+- **Vieja**: categorías: `mtb | road | urban | kids | bmx | parts | accessories`
+- **Actual**: agrega `indumentaria` a esa lista.
+
+**Por qué**: se detectó que el catálogo de BiciMarket incluye ropa y equipamiento de ciclismo, y no había categoría que los agrupara. Se agregó durante la revisión del esquema.
+
+### 4. §6 Tabla de consistencia — identidad de usuario
+
+- **Vieja**: "Cada app tiene su Clerk / El Clerk de cada app / Cada Clerk es una base de usuarios independiente."
+- **Actual**: "Todas las apps comparten el mismo Clerk / El Clerk compartido / Un usuario tiene una sola cuenta de Clerk."
+
+Mismo motivo que el cambio en §0.

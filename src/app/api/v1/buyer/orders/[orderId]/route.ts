@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateBuyerProfile } from "@/lib/buyer-service";
+import { deepToSnakeCase } from "@/lib/case-utils";
 
 export async function GET(
   _: Request,
@@ -33,5 +34,5 @@ export async function GET(
     );
   }
 
-  return NextResponse.json(order);
+  return NextResponse.json(deepToSnakeCase(order));
 }

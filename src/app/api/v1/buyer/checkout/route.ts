@@ -16,9 +16,9 @@ import {
 } from "@/lib/entity-ids";
 
 const checkoutSchema = z.object({
-  shippingAddressId: z.string().min(1),
+  shipping_address_id: z.string().min(1),
   notes: z.string().optional(),
-  returnUrl: z.string().url(),
+  return_url: z.string().url(),
 });
 
 export async function POST(request: NextRequest) {
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       where: { buyerProfileId: profile.id },
       include: { items: true },
     }),
-    prisma.address.findUnique({ where: { id: parsed.data.shippingAddressId } }),
+    prisma.address.findUnique({ where: { id: parsed.data.shipping_address_id } }),
   ]);
 
   if (!cart || cart.items.length === 0) {
@@ -181,5 +181,5 @@ export async function POST(request: NextRequest) {
     data: { paymentId: payment.paymentId },
   });
 
-  return NextResponse.json({ paymentUrl: payment.paymentUrl, orderId: order.id });
+  return NextResponse.json({ payment_url: payment.paymentUrl, order_id: order.id });
 }

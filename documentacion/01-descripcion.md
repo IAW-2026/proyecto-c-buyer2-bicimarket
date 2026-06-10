@@ -275,3 +275,30 @@ Las máquinas de estado completas viven en `06-estados.md`. Versión corta:
 - **`payment.status`** (Payments): `pending → approved → rejected → refunded`. Estados terminales no se reabren.
 - **`settlement.status`** (Payments): `pending → paid → failed → manual_review`.
 
+---
+
+## Apéndice: Diferencias con documentacion-vieja
+
+### Cambio principal: de 4 Clerks a 1 Clerk compartido
+
+Este es el cambio más significativo de la documentación. En `documentacion-vieja`, la descripción del sistema indicaba que cada app tenía **su propio proyecto de Clerk** (cuatro Clerks distintos). La versión actual cambió a un **único proyecto de Clerk compartido** (el del Buyer App).
+
+| Aspecto | documentacion-vieja | documentacion actual |
+|---|---|---|
+| Proyectos de Clerk | 4 (uno por app) | 1 compartido |
+| Identidad de usuario | N cuentas separadas (una por app) | 1 sola cuenta en todas las apps |
+| Determinación del rol | Implícita por el Clerk de la app | Explícita vía `publicMetadata.role` |
+| Admin transversal | Necesitaba cuentas en cada Clerk | Una cuenta con `publicMetadata.admin=true` |
+
+**Por qué se hizo el cambio**: manejar 4 proyectos de Clerk separados implicaba 4 sets de claves, 4 procesos de onboarding independientes, y la imposibilidad de que un usuario fuera comprador y vendedor con la misma cuenta. El Clerk unificado simplifica la operación a cambio de gestionar roles de forma explícita con `publicMetadata`; para el alcance académico del proyecto este trade-off es claro.
+
+### Cambio en §3 (Actores)
+
+- **Vieja**: la tabla de actores listaba el Clerk específico que usaba cada actor (`Clerk-Buyer`, `Clerk-Seller`, etc.) como columna.
+- **Actual**: la tabla lista el valor de `publicMetadata` que distingue cada rol, sin columna de Clerk separado.
+
+### Cambio en §5 (Mapa de comunicación)
+
+- **Vieja**: la nota al pie del mapa repetía que cada app tenía su propio Clerk.
+- **Actual**: la nota al pie establece que todas las apps comparten el mismo proyecto de Clerk y referencia `05-usuarios.md` para los detalles.
+

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateBuyerProfile } from "@/lib/buyer-service";
 import { createAddressId } from "@/lib/entity-ids";
+import { deepToSnakeCase, deepToCamelCase } from "@/lib/case-utils";
 
 const addressSchema = z.object({
   alias: z.string().min(2),
@@ -12,9 +13,9 @@ const addressSchema = z.object({
   apartment: z.string().optional(),
   city: z.string().min(2),
   province: z.string().min(2),
-  postalCode: z.string().min(2),
+  postal_code: z.string().min(2),
   country: z.string().min(2),
-  isDefault: z.boolean().optional(),
+  is_default: z.boolean().optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
   ]);
 
   return NextResponse.json({
-    data: addresses,
+    data: addresses.map((a) => deepToSnakeCase(a)),
     pagination: {
       total,
       page,
@@ -80,7 +81,19 @@ export async function POST(request: NextRequest) {
 
   const profile = await getOrCreateBuyerProfile(userId);
 
-  if (parsed.data.isDefault) {
+  const addrData = deepToCamelCase<{
+    alias: string;
+    street: string;
+    number: string;
+    apartment?: string;
+    city: string;
+    province: string;
+    postalCode: string;
+    country: string;
+    isDefault?: boolean;
+  }>(parsed.data);
+
+  if (addrData.isDefault) {
     await prisma.address.updateMany({
       where: { buyerProfileId: profile.id, isDefault: true },
       data: { isDefault: false },
@@ -91,10 +104,10 @@ export async function POST(request: NextRequest) {
     data: {
       id: createAddressId(),
       buyerProfileId: profile.id,
-      ...parsed.data,
-      isDefault: parsed.data.isDefault ?? false,
+      ...addrData,
+      isDefault: addrData.isDefault ?? false,
     },
   });
 
-  return NextResponse.json(address, { status: 201 });
+  return NextResponse.json(deepToSnakeCase(address), { status: 201 });
 }

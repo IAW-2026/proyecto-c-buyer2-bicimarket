@@ -175,3 +175,43 @@ CLERK_SECRET_KEY=sk_live_…
 Las claves `CLERK_PUBLISHABLE_KEY` y `CLERK_SECRET_KEY` son idénticas en Buyer, Seller, Shipping y Payments App.
 
 ---
+
+## Apéndice: Diferencias con documentacion-vieja
+
+La documentación vieja describía un sistema con **4 Clerks independientes**; la actual describe un **único Clerk compartido**.
+
+### 1. Título y concepto central
+
+- **Vieja**: §1 se llamaba "Mapa de Clerks" y describía 4 proyectos de Clerk distintos (`buyer.bicimarket`, `seller.bicimarket`, `shipping.bicimarket`, `payments.bicimarket`), cada uno con su propio `audience` y `issuer`.
+- **Actual**: §1 se llama "Clerk compartido" y describe un único proyecto con roles diferenciados por `publicMetadata`.
+
+**Por qué**: gestionar 4 proyectos Clerk independientes para un sistema académico no aportaba valor. Implicaba 4 sets de claves que rotar, imposibilidad de que un usuario fuera comprador y vendedor con la misma cuenta, y que el rol admin requiriera cuentas separadas en cada Clerk. El Clerk unificado elimina toda esa fricción.
+
+### 2. Identidad del usuario
+
+| Aspecto | documentacion-vieja | documentacion actual |
+|---|---|---|
+| Cuentas por humano | N cuentas (una por app) | 1 sola cuenta |
+| Rol funcional | Implícito por el Clerk de la app | Explícito vía `publicMetadata.role` |
+| Correlación entre apps | Inexistente (cuentas aisladas) | Misma cuenta y `clerk_user_id` en todas |
+
+### 3. Rol `admin`
+
+- **Vieja**: un admin necesitaba **cuentas separadas en cada Clerk** donde quisiera operar, con `publicMetadata.admin=true` en cada una. Tenía que gestionar 4 contraseñas y 4 procesos de alta.
+- **Actual**: una sola cuenta con `publicMetadata.admin=true` vale para todas las apps simultáneamente.
+
+**Por qué**: con un Clerk compartido el admin tiene una sola identidad, lo que simplifica el onboarding y la revocación de privilegios.
+
+### 4. Claims JWT y validación
+
+- **Vieja**: cada app validaba el `iss` (issuer) y `aud` (audience) de **su propio Clerk**. Un JWT de Clerk-Seller era rechazado por Buyer App porque el issuer no coincidía.
+- **Actual**: todas las apps validan el mismo JWT emitido por el mismo Clerk. El control de acceso lo hace `publicMetadata.role`, no el issuer.
+
+### 5. Variables de entorno
+
+- **Vieja**: cada app tenía sus propias `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CLERK_ISSUER` y `CLERK_AUDIENCE`, todas distintas.
+- **Actual**: las cuatro apps comparten exactamente las mismas `CLERK_PUBLISHABLE_KEY` y `CLERK_SECRET_KEY` (las del Buyer App). No existen `CLERK_ISSUER` ni `CLERK_AUDIENCE` por separado.
+
+### 6. Lo que NO cambió
+
+Las secciones §3 (sincronización perezosa sin webhooks), §3.2 (defaults al crear perfil), §3.3 (soft delete), y los diagramas de flujo de alta (§§5.2–5.5) son **idénticos** en ambas versiones. La mecánica de provisioning local sigue siendo la misma; lo que cambió es que ahora el JWT viene siempre del mismo Clerk.

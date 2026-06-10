@@ -264,3 +264,30 @@ Todas son llamadas REST con `X-Service-Token`, salvo la última que es el webhoo
 | **Mercado Pago** _(externo, único webhook real)_ | Pago actualizado                    | Payments    | `POST`  | `/webhooks/mercadopago`                          |
 
 ---
+
+## Apéndice: Diferencias con documentacion-vieja
+
+### Tabla §1: eliminación de la columna "Clerk propio"
+
+- **Vieja**: la tabla de distribución incluía una columna "Clerk propio" donde cada app listaba su propio Clerk (`buyer.bicimarket`, `seller.bicimarket`, etc.).
+- **Actual**: esa columna se eliminó porque todas las apps ahora comparten un único proyecto de Clerk. No tiene sentido listar uno por app.
+
+**Por qué**: la decisión de unificar a un solo Clerk (documentada en `01-descripcion.md`) hace redundante cualquier columna que distinga Clerks por app.
+
+### §2 Regla 2 — Autenticación
+
+- **Vieja**: "validadas contra el Clerk de **esa misma app**". Cada app validaba JWTs de su propio issuer y audience.
+- **Actual**: "validadas contra el Clerk compartido". Todas las apps aceptan el mismo JWT porque comparten el mismo proyecto de Clerk.
+
+**Por qué**: consecuencia directa del cambio de arquitectura de identidad.
+
+### §7 Tabla de mecanismos de comunicación
+
+- **Vieja**: columna Auth decía "JWT validado contra Clerk de la misma app".
+- **Actual**: columna Auth dice "JWT validado contra el Clerk compartido".
+
+Mismo motivo que §2.
+
+### Sin otras diferencias estructurales
+
+Las reglas transversales (§2), los compromisos por app (§§3–6) y la tabla maestra de comunicación (§8) son idénticos en ambas versiones. El único cambio real de fondo en este archivo es la arquitectura de Clerk.

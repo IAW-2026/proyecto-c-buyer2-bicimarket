@@ -4,14 +4,15 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateBuyerProfile, calculateCartTotals } from "@/lib/buyer-service";
 import { createCartId, createCartItemId } from "@/lib/entity-ids";
+import { deepToSnakeCase, deepToCamelCase } from "@/lib/case-utils";
 
 const cartItemSchema = z.object({
-  productId: z.string().min(1),
-  sellerProfileId: z.string().min(1),
-  productNameSnapshot: z.string().min(1),
-  unitPriceCents: z.number().int().nonnegative(),
+  product_id: z.string().min(1),
+  seller_profile_id: z.string().min(1),
+  product_name_snapshot: z.string().min(1),
+  unit_price_cents: z.number().int().nonnegative(),
   quantity: z.number().int().positive(),
-  weightGramsSnapshot: z.number().int().nonnegative(),
+  weight_grams_snapshot: z.number().int().nonnegative(),
   currency: z.string().optional(),
 });
 
@@ -35,11 +36,11 @@ export async function GET() {
       data: { id: createCartId(), buyerProfileId: profile.id },
       include: { items: true },
     });
-    return NextResponse.json({ ...newCart, totalCents: 0, itemCount: 0 });
+    return NextResponse.json({ ...(deepToSnakeCase(newCart) as Record<string, unknown>), total_cents: 0, item_count: 0 });
   }
 
   const { totalCents, itemCount } = calculateCartTotals(cart.items);
-  return NextResponse.json({ ...cart, totalCents, itemCount });
+  return NextResponse.json({ ...(deepToSnakeCase(cart) as Record<string, unknown>), total_cents: totalCents, item_count: itemCount });
 }
 
 export async function POST(request: NextRequest) {
@@ -66,6 +67,16 @@ export async function POST(request: NextRequest) {
   }
 
   const profile = await getOrCreateBuyerProfile(userId);
+  const d = deepToCamelCase<{
+    productId: string;
+    sellerProfileId: string;
+    productNameSnapshot: string;
+    unitPriceCents: number;
+    quantity: number;
+    weightGramsSnapshot: number;
+    currency?: string;
+  }>(parsed.data);
+
   const cart = await prisma.cart.upsert({
     where: { buyerProfileId: profile.id },
     create: { id: createCartId(), buyerProfileId: profile.id },
@@ -73,28 +84,28 @@ export async function POST(request: NextRequest) {
   });
 
   const isNew = !(await prisma.cartItem.findFirst({
-    where: { cartId: cart.id, productId: parsed.data.productId },
+    where: { cartId: cart.id, productId: d.productId },
     select: { id: true },
   }));
 
   const item = await prisma.cartItem.upsert({
-    where: { cartId_productId: { cartId: cart.id, productId: parsed.data.productId } },
+    where: { cartId_productId: { cartId: cart.id, productId: d.productId } },
     create: {
       id: createCartItemId(),
       cartId: cart.id,
-      productId: parsed.data.productId,
-      sellerProfileId: parsed.data.sellerProfileId,
-      productNameSnapshot: parsed.data.productNameSnapshot,
-      unitPriceCents: parsed.data.unitPriceCents,
-      quantity: parsed.data.quantity,
-      weightGramsSnapshot: parsed.data.weightGramsSnapshot,
-      currency: parsed.data.currency ?? "ARS",
+      productId: d.productId,
+      sellerProfileId: d.sellerProfileId,
+      productNameSnapshot: d.productNameSnapshot,
+      unitPriceCents: d.unitPriceCents,
+      quantity: d.quantity,
+      weightGramsSnapshot: d.weightGramsSnapshot,
+      currency: d.currency ?? "ARS",
     },
     update: {
-      quantity: { increment: parsed.data.quantity },
-      unitPriceCents: parsed.data.unitPriceCents,
+      quantity: { increment: d.quantity },
+      unitPriceCents: d.unitPriceCents,
     },
   });
 
-  return NextResponse.json(item, { status: isNew ? 201 : 200 });
+  return NextResponse.json(deepToSnakeCase(item), { status: isNew ? 201 : 200 });
 }

@@ -11,6 +11,12 @@ export type CheckoutResult = {
 };
 
 export async function checkoutCart(payload: CheckoutBody): Promise<CheckoutResult> {
-  const { data } = await api.post<CheckoutResult>("/v1/buyer/checkout", payload);
-  return data;
+  const { data } = await api.post("/v1/buyer/checkout", {
+    shipping_address_id: payload.shippingAddressId,
+    return_url: payload.returnUrl,
+  });
+  return {
+    paymentUrl: data.payment_url,
+    orderId: data.order_id,
+  };
 }

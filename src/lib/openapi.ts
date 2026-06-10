@@ -609,15 +609,15 @@ export const openapiSpec: OpenAPIV3.Document = {
             "application/json": {
               schema: {
                 type: "object",
-                required: ["shippingAddressId", "returnUrl"],
+                required: ["shipping_address_id", "return_url"],
                 properties: {
-                  shippingAddressId: { type: "string", description: "ID de la dirección de envío guardada" },
-                  returnUrl: { type: "string", format: "uri", description: "URL a redirigir tras el pago" },
+                  shipping_address_id: { type: "string", description: "ID de la dirección de envío guardada" },
+                  return_url: { type: "string", format: "uri", description: "URL a redirigir tras el pago" },
                 },
               },
               example: {
-                shippingAddressId: "clx0abc123",
-                returnUrl: "http://localhost:3000/orders",
+                shipping_address_id: "clx0abc123",
+                return_url: "http://localhost:3000/orders",
               },
             },
           },
@@ -630,8 +630,8 @@ export const openapiSpec: OpenAPIV3.Document = {
                 schema: {
                   type: "object",
                   properties: {
-                    paymentUrl: { type: "string", format: "uri" },
-                    orderId: { type: "string" },
+                    payment_url: { type: "string", format: "uri" },
+                    order_id: { type: "string" },
                   },
                 },
               },

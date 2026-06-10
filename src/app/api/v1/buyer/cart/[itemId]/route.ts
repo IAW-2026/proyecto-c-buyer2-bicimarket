@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateBuyerProfile } from "@/lib/buyer-service";
+import { deepToSnakeCase } from "@/lib/case-utils";
 
 const quantitySchema = z.object({ quantity: z.number().int().min(1) });
 
@@ -57,7 +58,7 @@ export async function PATCH(
     data: { quantity: parsed.data.quantity },
   });
 
-  return NextResponse.json(updated);
+  return NextResponse.json(deepToSnakeCase(updated));
 }
 
 export async function DELETE(

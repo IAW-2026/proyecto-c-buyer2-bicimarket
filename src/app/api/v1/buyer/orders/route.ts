@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateBuyerProfile } from "@/lib/buyer-service";
+import { deepToSnakeCase } from "@/lib/case-utils";
 
 export async function GET(request: NextRequest) {
   const { userId } = await auth();
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
   ]);
 
   return NextResponse.json({
-    data: orders,
+    data: orders.map((o) => deepToSnakeCase(o)),
     pagination: {
       total,
       page,

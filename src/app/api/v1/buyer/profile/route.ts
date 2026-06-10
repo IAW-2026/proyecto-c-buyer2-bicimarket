@@ -3,9 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateBuyerProfile } from "@/lib/buyer-service";
+import { deepToSnakeCase, deepToCamelCase } from "@/lib/case-utils";
 
 const updateProfileSchema = z.object({
-  fullName: z.string().min(2).optional(),
+  full_name: z.string().min(2).optional(),
   phone: z.string().optional(),
 });
 
@@ -19,7 +20,7 @@ export async function GET() {
   }
 
   const profile = await getOrCreateBuyerProfile(userId);
-  return NextResponse.json(profile);
+  return NextResponse.json(deepToSnakeCase(profile));
 }
 
 export async function PATCH(request: NextRequest) {
@@ -47,10 +48,11 @@ export async function PATCH(request: NextRequest) {
   }
 
   const profile = await getOrCreateBuyerProfile(userId);
+  const profileData = deepToCamelCase<{ fullName?: string; phone?: string }>(parsed.data);
   const updated = await prisma.buyerProfile.update({
     where: { id: profile.id },
-    data: parsed.data,
+    data: profileData,
   });
 
-  return NextResponse.json(updated);
+  return NextResponse.json(deepToSnakeCase(updated));
 }

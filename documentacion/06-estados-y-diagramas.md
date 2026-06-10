@@ -223,3 +223,11 @@ Toda app que reciba un cambio de estado debe **rechazar transiciones inválidas 
 | in_transit       | ❌               | ❌        | ❌         | ✅               | ✅        | ✅              | ❌       |
 | out_for_delivery | ❌               | ❌        | ❌         | ❌               | ✅        | ✅              | ❌       |
 | failed_delivery  | ❌               | ❌        | ✅         | ❌               | ❌        | ❌              | ✅       |
+
+---
+
+## Apéndice: Sin diferencias con documentacion-vieja
+
+Este archivo es **idéntico** en ambas versiones. Las máquinas de estado, las tablas de transiciones permitidas y los diagramas de carril de casos no felices no sufrieron ningún cambio entre la documentación vieja y la actual.
+
+El motivo es que estas máquinas de estado dependen de la lógica de negocio (qué estados existen y qué transiciones son válidas), y esa lógica no se vio afectada por los cambios de arquitectura de identidad (Clerk compartido) ni por los cambios de rutas del Buyer App que sí modificaron los otros archivos.

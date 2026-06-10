@@ -4,9 +4,10 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateBuyerProfile } from "@/lib/buyer-service";
 import { createFavoriteId } from "@/lib/entity-ids";
+import { deepToSnakeCase } from "@/lib/case-utils";
 
 const favoriteSchema = z.object({
-  productId: z.string().min(1),
+  product_id: z.string().min(1),
 });
 
 export async function GET(request: NextRequest) {
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
   ]);
 
   return NextResponse.json({
-    data: favorites,
+    data: favorites.map((f) => deepToSnakeCase(f)),
     pagination: {
       total,
       page,
@@ -77,12 +78,12 @@ export async function POST(request: NextRequest) {
     where: {
       buyerProfileId_productId: {
         buyerProfileId: profile.id,
-        productId: parsed.data.productId,
+        productId: parsed.data.product_id,
       },
     },
-    create: { id: createFavoriteId(), buyerProfileId: profile.id, productId: parsed.data.productId },
+    create: { id: createFavoriteId(), buyerProfileId: profile.id, productId: parsed.data.product_id },
     update: {},
   });
 
-  return NextResponse.json(favorite, { status: 201 });
+  return NextResponse.json(deepToSnakeCase(favorite), { status: 201 });
 }

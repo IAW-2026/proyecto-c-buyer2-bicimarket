@@ -317,90 +317,31 @@ Buyer App llama internamente a `GET /api/v1/products/{id}/availability` en Selle
 
 ### `POST /api/v1/buyer/checkout`
 
-Crea la orden a partir del carrito + dirección + cotizaciones. **Idempotency-Key obligatorio.**
+Crea la orden a partir del carrito activo + dirección. El costo de envío se cotiza automáticamente contra la Shipping App al momento del checkout.
 
 **Request**
 
 ```json
 {
   "shipping_address_id": "adr_01H…",
-  "seller_groups": [
-    {
-      "seller_profile_id": "slp_01H…",
-      "shipping_quote_id": "qte_01H…"
-    },
-    {
-      "seller_profile_id": "slp_02H…",
-      "shipping_quote_id": "qte_02H…"
-    }
-  ],
+  "returnUrl": "https://buyer.bicimarket.com/orders",
   "notes": "Dejar en portería si no hay nadie."
 }
 ```
 
-**Response 201**
+**Response 200**
 
 ```json
 {
-  "id": "ord_01H8X9…",
-  "buyer_profile_id": "byp_01H…",
-  "status": "pending_payment",
-  "items_total_cents": 74000000,
-  "shipping_total_cents": 1500000,
-  "total_cents": 75500000,
-  "currency": "ARS",
-  "shipping_address_snapshot": {
-    "street": "Av. Corrientes",
-    "number": "1234",
-    "city": "CABA",
-    "province": "Buenos Aires",
-    "postal_code": "C1043",
-    "country": "AR"
-  },
-  "seller_groups": [
-    {
-      "id": "osg_01H…",
-      "seller_profile_id": "slp_01H…",
-      "items_subtotal_cents": 65000000,
-      "shipping_cost_cents": 1200000,
-      "shipping_quote_id": "qte_01H…",
-      "weight_grams_total": 14500,
-      "status": "pending",
-      "shipping_status": "pending",
-      "shipment_id": null
-    },
-    {
-      "id": "osg_02H…",
-      "seller_profile_id": "slp_02H…",
-      "items_subtotal_cents": 9000000,
-      "shipping_cost_cents": 300000,
-      "shipping_quote_id": "qte_02H…",
-      "weight_grams_total": 1500,
-      "status": "pending",
-      "shipping_status": "pending",
-      "shipment_id": null
-    }
-  ],
-  "items": [
-    {
-      "id": "oit_01H…",
-      "seller_group_id": "osg_01H…",
-      "product_id": "prd_01H…",
-      "product_name_snapshot": "Bicicleta Trek Marlin 5",
-      "unit_price_cents": 65000000,
-      "quantity": 1,
-      "weight_grams_snapshot": 14500
-    }
-  ],
-  "created_at": "2026-04-25T14:32:00Z"
+  "paymentUrl": "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=…",
+  "orderId": "ord_01H8X9…"
 }
 ```
 
 **Errores**:
 
-- `409 CART_EMPTY`
-- `409 QUOTE_EXPIRED` con `details: { quote_id, expires_at }`
-- `422 ADDRESS_INVALID`
+- `400 CART_EMPTY`
+- `400 ADDRESS_NOT_FOUND`
 
 ### `GET /api/v1/buyer/orders/{orderId}`
 
@@ -435,9 +376,7 @@ Lo llama Payments App. Requiere `X-Service-Token`.
 ```json
 {
   "status": "paid",
-  "source": "payments",
-  "payment_id": "pay_01H…",
-  "occurred_at": "2026-04-25T14:35:00Z"
+  "payment_id": "pay_01H…"
 }
 ```
 
@@ -475,26 +414,29 @@ Lo llama Shipping App.
 
 ```json
 {
+  "status": "in_transit",
   "shipping_status": "in_transit",
   "shipment_id": "shp_01H…",
   "tracking_number": "TRK-AR-789",
-  "occurred_at": "2026-04-26T08:10:00Z"
+  "tracking_url": "https://tracking.andreani.com/…"
 }
 ```
 
-`shipping_status` válido: `ready_for_pickup` | `picked_up` | `in_transit` | `out_for_delivery` | `delivered` | `returned`.
+`status` (obligatorio) actualiza `order_seller_group.status`: `preparing` | `ready_to_ship` | `in_transit` | `delivered`.
+
+`shipping_status` (opcional) actualiza el estado de envío físico: `created` | `ready_for_pickup` | `picked_up` | `in_transit` | `out_for_delivery` | `delivered` | `failed_delivery` | `returned`.
 
 **Response 200**: el seller_group actualizado.
 
 ### `POST /api/v1/buyer/orders/{orderId}/cancel`
 
-Solo si `status=pending_payment`.
+Solo si `status` es `pending_payment`, `paid` o `payment_failed`.
 
-**Request**: `{ "reason": "Cambié de opinión" }`.
+**Request**: sin body.
 
-**Response 200**: orden con `status=cancelled`.
+**Response 200**: `{ "id": "ord_01H…", "status": "cancelled" }`.
 
-**Error 409 CANNOT_CANCEL** si ya está paga.
+**Error 409 ORDER_NOT_CANCELLABLE** si el estado no permite cancelación.
 
 ---
 
@@ -841,29 +783,32 @@ Owner: Enrique Seitz. Clerk: `shipping.bicimarket`.
 
 ### `POST /api/v1/shipping-quotes`
 
-Lo llama Buyer App durante el checkout. Una cotización por cada `seller_group`.
+Lo llama Buyer App durante el checkout. Un único request con todos los orígenes (uno por vendedor).
 
 **Request**
 
 ```json
 {
-  "from": {
-    "seller_profile_id": "slp_01H…"
-  },
+  "pickups": [
+    {
+      "seller_profile_id": "slp_01H…",
+      "packages": [
+        { "weight_grams": 14500, "length_cm": 40, "width_cm": 30, "height_cm": 20 }
+      ]
+    },
+    {
+      "seller_profile_id": "slp_02H…",
+      "packages": [
+        { "weight_grams": 750, "length_cm": 40, "width_cm": 30, "height_cm": 20 }
+      ]
+    }
+  ],
   "to": {
     "city": "CABA",
     "province": "Buenos Aires",
     "postal_code": "C1043",
     "country": "AR"
   },
-  "packages": [
-    {
-      "weight_grams": 14500,
-      "length_cm": 180,
-      "width_cm": 60,
-      "height_cm": 110
-    }
-  ],
   "service_level": "standard"
 }
 ```
@@ -874,21 +819,15 @@ Lo llama Buyer App durante el checkout. Una cotización por cada `seller_group`.
 
 ```json
 {
-  "id": "qte_01H…",
-  "seller_profile_id": "slp_01H…",
-  "service_level": "standard",
-  "carrier": "andreani",
-  "cost_cents": 1200000,
-  "currency": "ARS",
-  "estimated_days_min": 3,
-  "estimated_days_max": 5,
-  "weight_grams_total": 14500,
-  "packages_count": 1,
-  "expires_at": "2026-04-25T15:32:00Z"
+  "origins_count": 2,
+  "discount_pct": 0.05,
+  "total_gross_cents": 1800000,
+  "total_net_cents": 1710000,
+  "currency": "ARS"
 }
 ```
 
-`expires_at` = ahora + 60 minutos. Buyer App debe usar esta `quote_id` al crear la orden, y Shipping valida que no esté vencida cuando se crea el shipment.
+`discount_pct` = 5 % por cada origen extra, tope 20 %. `total_net_cents` es el monto que se cobra al comprador.
 
 ---
 
@@ -1488,7 +1427,7 @@ El body es el del endpoint receptor (ver cada sección de este doc), no un envel
 
 | Disparador                                 | Origen   | Destino  | Llamada REST                                           |
 | ------------------------------------------ | -------- | -------- | ------------------------------------------------------ |
-| Pago aprobado / rechazado / refunded       | Payments | Buyer    | `PATCH /api/v1/orders/{id}/status`                     |
+| Pago aprobado / rechazado / refunded       | Payments | Buyer    | `PATCH /api/v1/orders/{id}`                            |
 | Pago aprobado → crear sub-orden por seller | Payments | Seller   | `POST /api/v1/sales-orders`                            |
 | Liquidación settled                        | Payments | Seller   | `PATCH /api/v1/sales-orders/{id}/payment-status`       |
 | Vendedor acepta orden                      | Seller   | Buyer    | `PATCH /api/v1/orders/{id}/seller-groups/{g}/status`   |
@@ -1526,3 +1465,87 @@ MERCADOPAGO_WEBHOOK_SECRET=…
 ```
 
 ---
+
+## Apéndice: Diferencias con documentacion-vieja
+
+Este archivo tiene las diferencias más numerosas entre los dos. Se agrupan por área.
+
+### 1. Prefijo `/buyer/` en todas las rutas del Buyer App
+
+| documentacion-vieja | documentacion actual |
+|---|---|
+| `GET /api/v1/buyer-profile/me` | `GET /api/v1/buyer/profile` |
+| `PUT /api/v1/buyer-profile/me` | `PATCH /api/v1/buyer/profile` |
+| `GET /api/v1/addresses` | `GET /api/v1/buyer/addresses` |
+| `POST /api/v1/addresses` | `POST /api/v1/buyer/addresses` |
+| `PUT /api/v1/addresses/{id}` | `PATCH /api/v1/buyer/addresses/{addressId}` |
+| `GET /api/v1/cart` | `GET /api/v1/buyer/cart` |
+| `POST /api/v1/cart/items` | `POST /api/v1/buyer/cart` |
+| `PATCH /api/v1/cart/items/{itemId}` | `PATCH /api/v1/buyer/cart/{itemId}` |
+| `DELETE /api/v1/cart/items/{itemId}` | `DELETE /api/v1/buyer/cart/{itemId}` |
+| `GET /api/v1/favorites` | `GET /api/v1/buyer/favorites` |
+| `POST /api/v1/favorites` | `POST /api/v1/buyer/favorites` |
+| `DELETE /api/v1/favorites/{id}` | `DELETE /api/v1/buyer/favorites/{favoriteId}` |
+| `GET /api/v1/orders` | `GET /api/v1/buyer/orders` |
+| `GET /api/v1/orders/{id}` | `GET /api/v1/buyer/orders/{orderId}` |
+
+**Por qué**: agregar el prefijo `/buyer/` hace explícito a qué dominio pertenece cada endpoint. Rutas como `/api/v1/addresses` eran ambiguas (¿buyer o seller?); `/api/v1/buyer/addresses` no lo es. También facilita la separación en el router y evita colisiones si en el futuro se unificaran dos apps en el mismo servidor.
+
+### 2. `PUT` → `PATCH` en perfil y direcciones
+
+- **Vieja**: `PUT /buyer-profile/me` y `PUT /addresses/{id}` (replace total, idempotente).
+- **Actual**: `PATCH /buyer/profile` y `PATCH /buyer/addresses/{addressId}` (update parcial).
+
+**Por qué**: el comprador típicamente actualiza uno o dos campos. `PATCH` es más adecuado semánticamente y no requiere enviar el objeto completo en cada actualización.
+
+### 3. Flujo de checkout unificado: `POST /orders` → `POST /buyer/checkout`
+
+Este es el cambio más importante en el contrato de la Buyer App.
+
+**Vieja (`POST /api/v1/orders`)**: el frontend era responsable de:
+1. Llamar a Shipping para cotizar cada `seller_group` individualmente (obteniendo un `quote_id` por seller).
+2. Armar el body con el array `seller_groups` incluyendo los `shipping_quote_id` de cada uno.
+3. La respuesta era la orden completa con `status=pending_payment`; el pago se iniciaba en un paso posterior.
+
+**Actual (`POST /api/v1/buyer/checkout`)**: el frontend solo envía `shipping_address_id` y `returnUrl`. El handler de checkout:
+1. Cotiza el envío internamente contra Shipping App.
+2. Crea la orden.
+3. Inicia el pago contra Payments App.
+4. Devuelve directamente `{ paymentUrl, orderId }`.
+
+**Por qué**: simplificación del flujo de UI. Lo que antes eran 3 llamadas desde el frontend (cotizar + crear orden + crear pago) se reduce a 1. El backend orquesta la secuencia completa y el frontend solo necesita redirigir al `paymentUrl`.
+
+### 4. `PATCH /orders/{id}/status` → cuerpo más simple
+
+- **Vieja**: el body incluía `source` y `occurred_at` además de `status` y `payment_id`.
+- **Actual**: solo `status` y `payment_id`.
+
+**Por qué**: `source` y `occurred_at` son metadatos útiles para auditoría, pero esa información ya la registra Buyer App internamente al recibir el PATCH. No hace falta que Payments los envíe; simplifica el contrato.
+
+### 5. `PATCH /orders/{id}/seller-groups/{g}/shipping`: campo `status` separado de `shipping_status`
+
+- **Vieja**: el body solo tenía `shipping_status` (estado físico del envío).
+- **Actual**: el body tiene `status` (actualiza `order_seller_group.status`, la vista de alto nivel que ve el comprador) y `shipping_status` (opcional, estado físico detallado). También se agregó `tracking_url`.
+
+**Por qué**: la UI del comprador muestra dos niveles de estado: el estado del grupo del vendedor (preparando, en camino, entregado) y el estado físico del envío (en distribución, en el camión, etc.). Separarlos en campos distintos en el PATCH permite que Shipping actualice uno sin pisar el otro.
+
+### 6. `POST /orders/{id}/cancel`: condiciones ampliadas
+
+- **Vieja**: solo cancelable si `status=pending_payment`.
+- **Actual**: cancelable si `status` es `pending_payment`, `paid` o `payment_failed`.
+
+**Por qué**: se detectó que el comprador debería poder cancelar una orden incluso si el pago fue aprobado (mientras el vendedor aún no la haya aceptado), o si el pago falló sin que la orden sea automáticamente cancelada.
+
+### 7. Cotización de envío (SH1): endpoint batch con multi-origen
+
+- **Vieja**: una cotización por `seller_group` (una llamada por seller, devuelve un único resultado con `id`, `cost_cents`, etc.).
+- **Actual**: un único request con array `pickups` (todos los sellers de una compra), con descuento por multi-origen (`discount_pct`) y total neto agregado.
+
+**Por qué**: con el nuevo checkout unificado, Buyer App necesita cotizar todos los sellers de una sola vez. Un endpoint batch es más eficiente y permite aplicar descuentos entre orígenes de forma centralizada en Shipping App.
+
+### 8. Notificaciones: agregado de "Vendedor acepta orden" (Seller → Buyer)
+
+- **Vieja**: el mapa de notificaciones no contemplaba que Seller avisara a Buyer cuando el vendedor acepta la orden.
+- **Actual**: se agregó `PATCH /api/v1/orders/{id}/seller-groups/{g}/status` desde Seller → Buyer con `{ "status": "preparing" }`.
+
+**Por qué**: sin este callback, la UI del comprador no tenía forma de reflejar que el vendedor ya aceptó su pedido sin hacer polling. Es un estado visible e importante para el comprador.

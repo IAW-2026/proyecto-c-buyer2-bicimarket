@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@clerk/nextjs";
 import { api } from "@/lib/axios";
+import { deepToCamelCase } from "@/lib/case-utils";
 import type {
   Address,
   BuyerProfile,
@@ -25,8 +26,8 @@ export function useBuyerProfile() {
   return useQuery<BuyerProfile>({
     queryKey: ["buyer-profile"],
     queryFn: async () => {
-      const { data } = await api.get<BuyerProfile>("/v1/buyer/profile");
-      return data;
+      const { data } = await api.get("/v1/buyer/profile");
+      return deepToCamelCase<BuyerProfile>(data);
     },
   });
 }
@@ -37,10 +38,11 @@ export function useBuyerAddresses(page = 1) {
   return useQuery<{ data: Address[]; pagination: PaginationMeta }>({
     queryKey: ["buyer-addresses", page],
     queryFn: async () => {
-      const { data } = await api.get<{ data: Address[]; pagination: PaginationMeta }>(
-        `/v1/buyer/addresses?page=${page}&limit=10`,
-      );
-      return data;
+      const { data } = await api.get(`/v1/buyer/addresses?page=${page}&limit=10`);
+      return {
+        data: (data.data as unknown[]).map((a) => deepToCamelCase<Address>(a)),
+        pagination: data.pagination as PaginationMeta,
+      };
     },
   });
 }
@@ -52,8 +54,8 @@ export function useBuyerCart() {
   return useQuery<Cart>({
     queryKey: ["buyer-cart"],
     queryFn: async () => {
-      const { data } = await api.get<Cart>("/v1/buyer/cart");
-      return data;
+      const { data } = await api.get("/v1/buyer/cart");
+      return deepToCamelCase<Cart>(data);
     },
     enabled: !!isSignedIn,
   });
@@ -66,10 +68,11 @@ export function useFavoriteItems(page = 1) {
   return useQuery<{ data: FavoriteItem[]; pagination: PaginationMeta }>({
     queryKey: ["favorite-items", page],
     queryFn: async () => {
-      const { data } = await api.get<{ data: FavoriteItem[]; pagination: PaginationMeta }>(
-        `/v1/buyer/favorites?page=${page}&limit=12`,
-      );
-      return data;
+      const { data } = await api.get(`/v1/buyer/favorites?page=${page}&limit=12`);
+      return {
+        data: (data.data as unknown[]).map((f) => deepToCamelCase<FavoriteItem>(f)),
+        pagination: data.pagination as PaginationMeta,
+      };
     },
     enabled: !!isSignedIn,
   });
@@ -81,10 +84,11 @@ export function useBuyerOrders(page = 1) {
   return useQuery<{ data: Order[]; pagination: PaginationMeta }>({
     queryKey: ["buyer-orders", page],
     queryFn: async () => {
-      const { data } = await api.get<{ data: Order[]; pagination: PaginationMeta }>(
-        `/v1/buyer/orders?page=${page}&limit=10`,
-      );
-      return data;
+      const { data } = await api.get(`/v1/buyer/orders?page=${page}&limit=10`);
+      return {
+        data: (data.data as unknown[]).map((o) => deepToCamelCase<Order>(o)),
+        pagination: data.pagination as PaginationMeta,
+      };
     },
   });
 }
@@ -93,8 +97,8 @@ export function useBuyerOrder(orderId: string) {
   return useQuery<Order>({
     queryKey: ["buyer-orders", orderId],
     queryFn: async () => {
-      const { data } = await api.get<Order>(`/v1/buyer/orders/${orderId}`);
-      return data;
+      const { data } = await api.get(`/v1/buyer/orders/${orderId}`);
+      return deepToCamelCase<Order>(data);
     },
     enabled: Boolean(orderId),
   });
