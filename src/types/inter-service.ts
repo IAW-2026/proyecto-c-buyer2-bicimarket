@@ -120,25 +120,32 @@ export type Shipment = {
 
 export type CreatePaymentPayload = {
   order_id: string;
-  total_amount: number;
-  currency: "ARS";
+  buyer_clerk_user_id: string;
+  buyer_profile_id: string;
   buyer_email: string;
-  items: Array<{
-    title: string;
-    quantity: number;
-    unit_price: number;
+  amount_cents: number;
+  currency: "ARS";
+  items_summary: Array<{
     seller_profile_id: string;
+    subtotal_cents: number;
+    shipping_cost_cents: number;
+    order_seller_group_id: string;
+    items: Array<{
+      product_id: string;
+      product_name_snapshot: string;
+      unit_price_cents: number;
+      quantity: number;
+    }>;
   }>;
-  return_url: string;
+  return_urls?: { success: string; failure: string; pending: string };
   idempotency_key: string;
 };
 
-// POST /api/v1/payments → response
-export type PaymentSession = {
+// POST /api/v1/payments → response (envelope desenvuelto por payments-api.ts)
+export type PaymentSessionResult = {
   payment_id: string;
   checkout_url: string;
-  status: "pending";
-  expires_at: string;
+  preference_id: string;
 };
 
 // GET /api/v1/receipts/{paymentId}
@@ -146,7 +153,7 @@ export type PaymentReceipt = {
   payment_id: string;
   order_id: string;
   status: "pending" | "approved" | "rejected" | "refunded";
-  total_amount: number;
+  amount_cents: number;
   currency: "ARS";
   created_at: string;
   updated_at: string;

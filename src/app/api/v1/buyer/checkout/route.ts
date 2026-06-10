@@ -1,12 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import {
-  createPaymentSession,
-  getOrCreateBuyerProfile,
-  groupItemsBySeller,
-} from "@/lib/buyer-service";
+import { getOrCreateBuyerProfile, groupItemsBySeller } from "@/lib/buyer-service";
+import { createPayment } from "@/lib/payments-api";
 import { getShippingQuotes, DEFAULT_PACKAGE_DIMS } from "@/lib/shipping-api";
 import {
   createOrderId,
@@ -174,12 +172,40 @@ export async function POST(request: NextRequest) {
     prisma.cart.update({ where: { id: cart.id }, data: { status: "CONVERTED" } }),
   ]);
 
-  const payment = await createPaymentSession(order.id, totalCents);
+  const itemsSummary = createdGroups.map((group, index) => ({
+    seller_profile_id: groupedData[index].sellerProfileId,
+    subtotal_cents: groupedData[index].itemsSubtotalCents,
+    shipping_cost_cents: shippingPerGroup,
+    order_seller_group_id: group.id,
+    items: groupedData[index].items.map((item) => ({
+      product_id: item.productId,
+      product_name_snapshot: item.productNameSnapshot,
+      unit_price_cents: item.unitPriceCents,
+      quantity: item.quantity,
+    })),
+  }));
+
+  const baseReturnUrl = parsed.data.return_url;
+  const payment = await createPayment({
+    order_id: order.id,
+    buyer_clerk_user_id: userId,
+    buyer_profile_id: profile.id,
+    buyer_email: profile.email,
+    amount_cents: totalCents,
+    currency: "ARS",
+    items_summary: itemsSummary,
+    return_urls: {
+      success: `${baseReturnUrl}?result=success&order_id=${order.id}`,
+      failure: `${baseReturnUrl}?result=failure&order_id=${order.id}`,
+      pending: `${baseReturnUrl}?result=pending&order_id=${order.id}`,
+    },
+    idempotency_key: randomUUID(),
+  });
 
   await prisma.order.update({
     where: { id: order.id },
-    data: { paymentId: payment.paymentId },
+    data: { paymentId: payment.payment_id },
   });
 
-  return NextResponse.json({ payment_url: payment.paymentUrl, order_id: order.id });
+  return NextResponse.json({ payment_url: payment.checkout_url, order_id: order.id });
 }

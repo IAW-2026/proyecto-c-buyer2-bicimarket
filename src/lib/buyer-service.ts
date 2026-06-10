@@ -40,12 +40,3 @@ export function groupItemsBySeller<
     return groups;
   }, {});
 }
-
-
-export async function createPaymentSession(orderId: string, totalCents: number) {
-  return {
-    paymentId: `pay_${orderId}`,
-    paymentUrl: `https://example-payment.local/checkout?order=${orderId}`,
-    totalCents,
-  };
-}

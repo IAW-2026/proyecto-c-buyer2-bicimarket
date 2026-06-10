@@ -10,7 +10,7 @@
 
 - **Motor**: PostgreSQL 16+, una instancia por app (ideal: bases separadas en clusters separados; mínimo aceptable: bases separadas en el mismo cluster con usuarios distintos).
 - **ORM**: Prisma.
-- **IDs**: `String @id @default(cuid())` con prefijo de recurso (`ord_`, `prd_`, etc.) generado en aplicación.
+- **IDs**: `String @id @default(cuid())` en schema, sobrescrito via extensión de Prisma (`$extends`) que genera IDs con prefijo de recurso (`pay_`, `set_`, `pyt_`, `ref_`, `rec_`, etc.) en cada `create`. Ver `src/lib/id-generator.ts` y `src/lib/prisma.ts`.
 - **Timestamps**: `created_at @default(now())` y `updated_at @updatedAt` en toda tabla.
 - **Soft deletes**: `deleted_at DateTime?` en entidades con historial relevante (productos, perfiles).
 - **Snapshots**: cuando un campo viene de otra app (precio, dirección, nombre del producto), se guarda con sufijo `_snapshot` y **nunca se actualiza** una vez guardado.
@@ -399,7 +399,10 @@ Fuente de verdad de: `payment_id`, intentos, comprobantes, settlements (uno por 
 | `card_last4` | string? | |
 | `status` | enum (ver §6.5) | |
 | `gateway_reference` | string | `mp_payment_id` o `mp_preference_id` |
-| `idempotency_key` | string unique | |
+| `items_summary` | json? | desglose por vendedor: `[{ seller_profile_id, subtotal_cents, shipping_cost_cents, order_seller_group_id, items[] }]`, usado al llegar `shipment-delivered` para calcular settlements |
+| `idempotency_key` | string unique | previene duplicados permanentemente |
+| `checkout_url` | string? | URL de MP (`init_point` / `sandbox_init_point`) |
+| `preference_id` | string? | ID de preferencia de MP |
 | `approved_at` / `rejected_at` / `cancelled_at` | timestamps? | |
 | `created_at` / `updated_at` | timestamps | |
 
@@ -425,6 +428,7 @@ Fuente de verdad de: `payment_id`, intentos, comprobantes, settlements (uno por 
 | `receipt_number` | string | |
 | `receipt_url` | string | PDF |
 | `amount_cents` | int | |
+| `idempotency_key` | string unique? | |
 | `issued_at` | timestamp | |
 
 #### `settlements`
@@ -454,6 +458,7 @@ Fuente de verdad de: `payment_id`, intentos, comprobantes, settlements (uno por 
 | `status` | enum `pending` \| `in_progress` \| `completed` \| `failed` \| `manual_review` | |
 | `attempts` | int | |
 | `last_error` | string? | |
+| `idempotency_key` | string unique? | |
 | `started_at` / `completed_at` | timestamps? | |
 
 #### `refunds`
@@ -466,6 +471,7 @@ Fuente de verdad de: `payment_id`, intentos, comprobantes, settlements (uno por 
 | `reason` | enum `seller_rejected` \| `buyer_cancelled` \| `not_delivered` \| `manual` | |
 | `status` | enum `pending` \| `approved` \| `failed` | |
 | `gateway_reference` | string? | |
+| `idempotency_key` | string unique? | |
 | `created_at` | timestamp | |
 
 #### `mp_webhook_events` (solo entrante de Mercado Pago)
@@ -567,34 +573,69 @@ pending ─► paid (terminal)
 
 ---
 
-## Apéndice: Diferencias con documentacion-vieja
+## Apéndice: Cambios consolidados
 
-### 1. Regla de identidad en §0 (Reglas comunes a todas las DB)
+### A. Reglas comunes (§0) — IDs
 
-Este es el cambio más importante del archivo.
+| Anterior | Actual | Por qué |
+|----------|--------|---------|
+| `String @id @default(cuid())` con prefijo generado en aplicación | `String @id @default(cuid())` sobrescrito vía extensión de Prisma (`$extends`) que llama a `generateId(model)` de `src/lib/id-generator.ts` | El middleware `$extends` en `src/lib/prisma.ts` intercepta cada `create` y reemplaza el `id` generado por `cuid()` con un ID prefijado (`pay_`, `set_`, etc.). Esto garantiza IDs legibles estilo Stripe sin depender del `@default` del schema. |
 
-- **Vieja**: "cada app tiene su propio Clerk. `clerk_user_id` en cada perfil refiere al Clerk **de esa app**. No existe correlación entre Clerks: si un humano opera en varias apps, sus cuentas son independientes."
+### B. Regla de identidad (§0)
+
+- **Anterior**: "cada app tiene su propio Clerk. `clerk_user_id` en cada perfil refiere al Clerk **de esa app**. No existe correlación entre Clerks."
 - **Actual**: "todas las apps comparten el mismo proyecto de Clerk. El `clerk_user_id` es el mismo para un usuario dado sin importar en qué app lo lea."
 
-**Por qué**: consecuencia directa de la decisión de unificar el proyecto de Clerk (documentada en `01-descripcion.md`). Con un Clerk compartido, el mismo `clerk_user_id` identifica al usuario en todas las DBs, lo que simplifica queries cruzados y el provisioning de perfiles locales.
+### C. Buyer App — `carts.status`
 
-### 2. `carts.status`: eliminación del valor `abandoned`
-
-- **Vieja**: `enum active | converted | abandoned`
+- **Anterior**: `enum active | converted | abandoned`
 - **Actual**: `enum active | converted`
+- **Por qué**: detectar carritos abandonados requería un cron o webhook que estaba fuera del alcance. Sin mecanismo que transite a `abandoned`, el estado era dead code.
 
-**Por qué**: detectar un carrito abandonado requiere un mecanismo de trigger asincrónico: o bien un cron job que evalúe carritos inactivos pasado cierto TTL, o bien un webhook de sesión/actividad que notifique cuando el usuario abandona el flujo. El sistema no expone webhooks entre sus propias apps (el único webhook del sistema es el de Mercado Pago → Payments App), y agregar un cron con esa responsabilidad estaba fuera del alcance del proyecto. Sin un mecanismo que transite el carrito a `abandoned`, el estado era dead code documental. Se eliminó para que el esquema refleje solo los estados que el sistema efectivamente maneja.
+### D. Seller App — `products.category`
 
-### 3. `products.category`: agregado de `indumentaria`
+- **Anterior**: `mtb | road | urban | kids | bmx | parts | accessories`
+- **Actual**: agrega `indumentaria`.
 
-- **Vieja**: categorías: `mtb | road | urban | kids | bmx | parts | accessories`
-- **Actual**: agrega `indumentaria` a esa lista.
+### E. Payments App — Tabla `payments`
 
-**Por qué**: se detectó que el catálogo de BiciMarket incluye ropa y equipamiento de ciclismo, y no había categoría que los agrupara. Se agregó durante la revisión del esquema.
+| Campo | Anterior | Actual | Por qué |
+|-------|----------|--------|---------|
+| `checkout_url` | No existía | `string?` — URL de MP (`init_point`) | Se guarda post-creación de preferencia para devolver al frontend en respuestas de idempotencia. |
+| `preference_id` | No existía | `string?` — ID de preferencia de MP | Necesario para renderizar Wallet Brick en el frontend. |
+| `items_summary` | No existía | `json?` — `[{ seller_profile_id, subtotal_cents, shipping_cost_cents, order_seller_group_id, items[] }]` | Se persiste el payload completo del request para usarlo al calcular settlements cuando llega `shipment-delivered`. |
+| `idempotency_key` | `string unique` | `string unique` | Sin cambios. |
+| `method` | `enum?` | `enum` (mismo) | Sin cambios — se llena post-aprobación desde webhook. |
+| `card_last4` | No existía | `string?` | Se llena post-aprobación desde respuesta de MP. |
 
-### 4. §6 Tabla de consistencia — identidad de usuario
+### F. Payments App — Nuevas tablas de auditoría
 
-- **Vieja**: "Cada app tiene su Clerk / El Clerk de cada app / Cada Clerk es una base de usuarios independiente."
-- **Actual**: "Todas las apps comparten el mismo Clerk / El Clerk compartido / Un usuario tiene una sola cuenta de Clerk."
+| Tabla | Anterior | Actual | Por qué |
+|-------|----------|--------|---------|
+| `PaymentStatusHistory` | No existía | Modelo completo con `from_status`, `to_status`, `source`, `payload`, `occurred_at` | Auditoría de cambios de estado requerida para trazabilidad. |
+| `SettlementStatusHistory` | No existía | Idem | Idem. |
+| `RefundStatusHistory` | No existía | Idem | Idem. |
 
-Mismo motivo que el cambio en §0.
+### G. Payments App — Tablas modificadas
+
+#### `receipts`
+- **Nuevo**: `idempotency_key` (`string unique?`) — Idempotencia permanente.
+
+#### `refunds`
+- **Nuevo**: `idempotency_key` (`string unique?`) — Idempotencia permanente.
+
+#### `payouts`
+- **Nuevo**: `idempotency_key` (`string unique?`) — Idempotencia permanente.
+
+#### `settlements`
+- **Anterior**: Sin relación a `payouts`.
+- **Actual**: `payouts Payout[]` — un settlement puede tener múltiples intentos de payout.
+
+### H. Sin cambios
+
+- `payment_attempts` — idéntico.
+- `mp_webhook_events` — idéntico.
+- `outbound_calls_log` — idéntico.
+- Diagramas ER — idénticos.
+- Máquinas de estado (§5) — idénticas.
+- Datos duplicados (§6) — idéntico salvo la fila de identidad actualizada.

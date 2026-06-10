@@ -9,7 +9,7 @@
 import { createServiceClient } from "@/lib/service-client";
 import type {
   CreatePaymentPayload,
-  PaymentSession,
+  PaymentSessionResult,
   PaymentReceipt,
 } from "@/types/inter-service";
 
@@ -24,23 +24,31 @@ function getClient() {
 // Devuelve la URL a la que redirigir al comprador para completar el pago en Mercado Pago
 export async function createPayment(
   payload: CreatePaymentPayload,
-): Promise<PaymentSession> {
+): Promise<PaymentSessionResult> {
   const client = getClient();
 
   if (!client) {
-    // Mock: simula una sesión de pago mientras no hay Payments App
     return {
       payment_id: `pay_mock_${payload.order_id}`,
       checkout_url: `/orders?mock_payment_success=true&order_id=${payload.order_id}`,
-      status: "pending",
-      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      preference_id: "mock_preference",
     };
   }
 
-  const { data } = await client.post<PaymentSession>("/api/v1/payments", payload, {
-    headers: { "Idempotency-Key": payload.idempotency_key },
-  });
-  return data;
+  // Payments App devuelve { data: { payment_id, checkout_url, preference_id }, public_key }
+  try {
+    const { data: envelope } = await client.post<{
+      data: PaymentSessionResult;
+      public_key: string;
+    }>("/api/v1/payments", payload, {
+      headers: { "Idempotency-Key": payload.idempotency_key },
+    });
+    return envelope.data;
+  } catch (err: unknown) {
+    const res = (err as { response?: { status?: number; data?: unknown } }).response;
+    console.error("[payments-api] createPayment failed", res?.status, JSON.stringify(res?.data));
+    throw err;
+  }
 }
 
 // GET /api/v1/receipts/{paymentId} — obtiene el comprobante de pago

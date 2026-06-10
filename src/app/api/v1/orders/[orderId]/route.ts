@@ -52,6 +52,21 @@ export async function PATCH(
 
   const newStatus = STATUS_MAP[parsed.data.status];
 
+  const VALID_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
+    PENDING_PAYMENT: ["PAID", "PAYMENT_FAILED", "CANCELLED"],
+    PAID:            ["REFUNDED"],
+    PARTIALLY_SHIPPED: ["REFUNDED"],
+    SHIPPED:         ["REFUNDED"],
+    DELIVERED:       ["REFUNDED"],
+  };
+  const allowed = VALID_TRANSITIONS[order.status] ?? [];
+  if (!allowed.includes(newStatus)) {
+    return NextResponse.json(
+      { error: { code: "INVALID_TRANSITION", message: `No se puede pasar de ${order.status} a ${newStatus}`, details: {} } },
+      { status: 409 },
+    );
+  }
+
   const [updated] = await Promise.all([
     prisma.order.update({
       where: { id: orderId },
