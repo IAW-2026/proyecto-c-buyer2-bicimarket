@@ -37,6 +37,14 @@ export default function CheckoutPage() {
     defaultValues: { shippingAddressId: selectedAddressId ?? "" },
   });
 
+  const watchedAddressId = form.watch("shippingAddressId");
+  const {
+    data: shippingQuote,
+    isFetching: shippingFetching,
+    isError: shippingError,
+  } = useShippingPreview(watchedAddressId || undefined);
+  const totalShipping = shippingQuote?.total_net_cents ?? null;
+
   useEffect(() => {
     if (selectedAddressId) form.setValue("shippingAddressId", selectedAddressId);
   }, [selectedAddressId, form]);
@@ -65,13 +73,6 @@ export default function CheckoutPage() {
   }
 
   const sellerGroups = groupCartItemsBySeller(cart.items);
-  const watchedAddressId = form.watch("shippingAddressId");
-  const {
-    data: shippingQuote,
-    isFetching: shippingFetching,
-    isError: shippingError,
-  } = useShippingPreview(watchedAddressId || undefined);
-  const totalShipping = shippingQuote?.total_net_cents ?? null;
   const selectedAddress = addresses?.find((a) => a.id === watchedAddressId);
 
   return (
