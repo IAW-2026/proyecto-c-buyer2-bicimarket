@@ -1,4 +1,5 @@
 import { api } from "@/lib/axios";
+import type { ShippingQuoteResponse } from "@/types/inter-service";
 
 export type CheckoutBody = {
   shippingAddressId: string;
@@ -19,4 +20,11 @@ export async function checkoutCart(payload: CheckoutBody): Promise<CheckoutResul
     paymentUrl: data.payment_url,
     orderId: data.order_id,
   };
+}
+
+export async function fetchShippingPreview(addressId: string): Promise<ShippingQuoteResponse> {
+  const { data } = await api.get<ShippingQuoteResponse>(
+    `/v1/buyer/shipping-preview?address_id=${addressId}`,
+  );
+  return data;
 }

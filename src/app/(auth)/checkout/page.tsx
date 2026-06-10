@@ -5,8 +5,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRouter } from "next/navigation";
-import { CreditCard, Loader2, MapPin } from "lucide-react";
-import { useBuyerAddresses, useBuyerCart } from "@/hooks/use-buyer";
+import { CreditCard, Loader2, MapPin, RefreshCw } from "lucide-react";
+import { useBuyerAddresses, useBuyerCart, useShippingPreview } from "@/hooks/use-buyer";
 import { useCheckoutMutations } from "@/hooks/querys/checkout/useCheckoutMutations";
 import { useCartStore } from "@/store/use-cart-store";
 import { AddressSelector } from "@/components/checkout/address-selector";
@@ -65,12 +65,14 @@ export default function CheckoutPage() {
   }
 
   const sellerGroups = groupCartItemsBySeller(cart.items);
-  // Misma fórmula que el mock de shipping-api.ts: $10k base + $4k por vendedor
-  const n = sellerGroups.length;
-  const grossCents = 1_000_000 + 400_000 * n;
-  const discountPct = Math.min(0.05 * (n - 1), 0.2);
-  const totalShipping = Math.round(grossCents * (1 - discountPct));
-  const selectedAddress = addresses?.find((a) => a.id === form.watch("shippingAddressId"));
+  const watchedAddressId = form.watch("shippingAddressId");
+  const {
+    data: shippingQuote,
+    isFetching: shippingFetching,
+    isError: shippingError,
+  } = useShippingPreview(watchedAddressId || undefined);
+  const totalShipping = shippingQuote?.total_net_cents ?? null;
+  const selectedAddress = addresses?.find((a) => a.id === watchedAddressId);
 
   return (
     <div className="px-6 py-8">
@@ -142,26 +144,41 @@ export default function CheckoutPage() {
                   <span className="text-muted-foreground">Subtotal productos</span>
                   <PriceDisplay amount={cart.totalCents} />
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Total de envíos</span>
-                  <PriceDisplay amount={totalShipping} />
+                  {!watchedAddressId ? (
+                    <span className="text-xs text-muted-foreground">Seleccioná dirección</span>
+                  ) : shippingFetching ? (
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <RefreshCw className="size-3 animate-spin" />
+                      Calculando...
+                    </span>
+                  ) : shippingError ? (
+                    <span className="text-xs text-destructive">No disponible</span>
+                  ) : totalShipping !== null ? (
+                    <PriceDisplay amount={totalShipping} />
+                  ) : null}
                 </div>
               </div>
 
               <div className="border-t border-border/60 pt-3">
                 <div className="flex justify-between">
                   <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total</span>
-                  <PriceDisplay
-                    amount={cart.totalCents + totalShipping}
-                    className="text-2xl font-bold"
-                  />
+                  {totalShipping !== null && !shippingFetching && !shippingError ? (
+                    <PriceDisplay
+                      amount={cart.totalCents + totalShipping}
+                      className="text-2xl font-bold"
+                    />
+                  ) : (
+                    <span className="text-2xl font-bold text-muted-foreground">—</span>
+                  )}
                 </div>
               </div>
 
               <Button
                 type="submit"
                 className="w-full gap-2"
-                disabled={checkout.isPending || !selectedAddress}
+                disabled={checkout.isPending || !selectedAddress || shippingFetching || shippingError || totalShipping === null}
               >
                 {checkout.isPending ? (
                   <>

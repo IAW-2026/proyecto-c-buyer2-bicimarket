@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@clerk/nextjs";
 import { api } from "@/lib/axios";
 import { deepToCamelCase } from "@/lib/case-utils";
+import { fetchShippingPreview } from "@/services/api/checkout";
 import type {
   Address,
   BuyerProfile,
@@ -12,6 +13,7 @@ import type {
   Order,
   Product,
 } from "@/types/buyer";
+import type { ShippingQuoteResponse } from "@/types/inter-service";
 
 export interface PaginationMeta {
   total: number;
@@ -128,5 +130,17 @@ export function useProduct(productId: string) {
       return data;
     },
     enabled: !!productId,
+  });
+}
+
+// ─── Shipping preview ─────────────────────────────────────────────────────────
+
+export function useShippingPreview(addressId: string | undefined) {
+  return useQuery<ShippingQuoteResponse>({
+    queryKey: ["shipping-preview", addressId],
+    queryFn: () => fetchShippingPreview(addressId!),
+    enabled: !!addressId,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
   });
 }
