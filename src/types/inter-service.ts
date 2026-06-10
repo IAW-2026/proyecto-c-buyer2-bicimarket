@@ -80,12 +80,28 @@ export type ShippingQuoteRequest = {
   service_level: ServiceLevel;
 };
 
+// POST /api/v1/shipping-quotes — cotización individual por vendedor
+export type ShippingQuote = {
+  id: string;
+  seller_profile_id: string;
+  service_level: ServiceLevel;
+  carrier: string;
+  cost_cents: number;
+  currency: string;
+  estimated_days_min: number;
+  estimated_days_max: number;
+  weight_grams_total: number;
+  packages_count: number;
+  expires_at: string;
+};
+
 // POST /api/v1/shipping-quotes — response
 export type ShippingQuoteResponse = {
+  quotes: ShippingQuote[];    // una cotización por vendedor (seller_profile_id)
   origins_count: number;
   discount_pct: number;       // 5% por origen extra, tope 20%
   total_gross_cents: number;
-  total_net_cents: number;    // lo que se cobra al comprador
+  total_net_cents: number;    // lo que se cobra al comprador (con descuento)
   currency: string;
 };
 
@@ -177,11 +193,9 @@ export type IncomingOrderStatusPatch = {
 // PATCH /api/v1/orders/{orderId}/seller-groups/{groupId}/shipping
 // Shipping App → Buyer App (cuando cambia el estado del envío)
 export type IncomingSellerGroupShippingPatch = {
-  status:
-    | "preparing"
-    | "ready_to_ship"
-    | "in_transit"
-    | "delivered";
+  status: "preparing" | "ready_to_ship" | "in_transit" | "delivered";
+  shipping_status?: "created" | "ready_for_pickup" | "picked_up" | "in_transit" | "out_for_delivery" | "delivered" | "failed_delivery" | "returned";
+  shipment_id?: string;
   tracking_number?: string;
   tracking_url?: string;
 };

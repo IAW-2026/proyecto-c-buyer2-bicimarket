@@ -109,6 +109,12 @@ export async function POST(request: NextRequest) {
 
   const shippingTotalCents = quoteResponse.total_net_cents;
 
+  // Mapa por seller_profile_id para asignar quote individual a cada grupo
+  const quotesBySeller = new Map(
+    quoteResponse.quotes.map((q) => [q.seller_profile_id, q]),
+  );
+  const discountFactor = 1 - (quoteResponse.discount_pct ?? 0);
+
   const itemsTotalCents = groupedData.reduce((s, g) => s + g.itemsSubtotalCents, 0);
   const totalCents = itemsTotalCents + shippingTotalCents;
 
@@ -126,22 +132,26 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  const shippingPerGroup = Math.round(shippingTotalCents / groupedData.length);
-
   const createdGroups = await Promise.all(
-    groupedData.map((g) =>
-      prisma.orderSellerGroup.create({
+    groupedData.map((g) => {
+      const quote = quotesBySeller.get(g.sellerProfileId);
+      // Costo con descuento; si no hay quote para este seller (caso edge), reparte proporcionalmente
+      const shippingCostCents = quote
+        ? Math.round(quote.cost_cents * discountFactor)
+        : Math.round(shippingTotalCents / groupedData.length);
+      return prisma.orderSellerGroup.create({
         data: {
           id: createOrderSellerGroupId(),
           orderId: order.id,
           sellerProfileId: g.sellerProfileId,
           itemsSubtotalCents: g.itemsSubtotalCents,
-          shippingCostCents: shippingPerGroup,
+          shippingCostCents,
+          shippingQuoteId: quote?.id ?? null,
           weightGramsTotal: g.weightGramsTotal,
           status: "PENDING",
         },
-      }),
-    ),
+      });
+    }),
   );
 
   const orderItems = createdGroups.flatMap((group, index) =>
@@ -175,7 +185,7 @@ export async function POST(request: NextRequest) {
   const itemsSummary = createdGroups.map((group, index) => ({
     seller_profile_id: groupedData[index].sellerProfileId,
     subtotal_cents: groupedData[index].itemsSubtotalCents,
-    shipping_cost_cents: shippingPerGroup,
+    shipping_cost_cents: group.shippingCostCents,
     order_seller_group_id: group.id,
     items: groupedData[index].items.map((item) => ({
       product_id: item.productId,

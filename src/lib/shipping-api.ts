@@ -1,9 +1,6 @@
 // Funciones para llamar a la Shipping App.
 // Requiere: SHIPPING_APP_URL y BUYER_TO_SHIPPING_SERVICE_TOKEN en variables de entorno.
 //
-// Si las variables no están configuradas, devuelve cotizaciones mock
-// para que puedas desarrollar sin la Shipping App corriendo.
-//
 // Ver documentacion/03-apis.md — sección "Shipping App endpoints"
 
 import { createServiceClient } from "@/lib/service-client";
@@ -20,7 +17,9 @@ export const DEFAULT_PACKAGE_DIMS = { length_cm: 40, width_cm: 30, height_cm: 20
 function getClient() {
   const baseURL = process.env.SHIPPING_APP_URL;
   const token = process.env.BUYER_TO_SHIPPING_SERVICE_TOKEN;
-  if (!baseURL || !token) return null;
+  if (!baseURL || !token) {
+    throw new Error("SHIPPING_APP_URL y BUYER_TO_SHIPPING_SERVICE_TOKEN son requeridos");
+  }
   return createServiceClient(baseURL, token);
 }
 
@@ -29,11 +28,6 @@ export async function getShippingQuotes(
   req: ShippingQuoteRequest,
 ): Promise<ShippingQuoteResponse> {
   const client = getClient();
-
-  if (!client) {
-    return buildMockResponse(req);
-  }
-
   const { data } = await client.post<ShippingQuoteResponse>(
     "/api/v1/shipping-quotes",
     req,
@@ -42,7 +36,6 @@ export async function getShippingQuotes(
 }
 
 // GET /api/v1/quote-preview — estimado sin persistencia (para mostrar precio en carrito)
-// Retorna null si no hay client configurado (requiere CPs reales, no tiene mock)
 export async function getShippingQuotePreview(params: {
   pickup_postal_code: string;
   shipping_postal_code: string;
@@ -50,8 +43,6 @@ export async function getShippingQuotePreview(params: {
   service_level: "standard" | "express" | "same_day";
 }): Promise<ShippingQuotePreview | null> {
   const client = getClient();
-  if (!client) return null;
-
   const { data } = await client.get<ShippingQuotePreview>("/api/v1/quote-preview", {
     params,
   });
@@ -61,29 +52,9 @@ export async function getShippingQuotePreview(params: {
 // GET /api/v1/shipments?orderId={orderId} — seguimiento de envíos de una orden
 export async function getShipmentsByOrder(orderId: string): Promise<Shipment[]> {
   const client = getClient();
-  if (!client) return [];
-
-  const { data } = await client.get<Shipment[]>("/api/v1/shipments", {
-    params: { orderId },
-  });
-  return data;
-}
-
-// ----------------------------------------------------------------
-// Mock — se usa cuando SHIPPING_APP_URL no está configurada
-// ----------------------------------------------------------------
-function buildMockResponse(req: ShippingQuoteRequest): ShippingQuoteResponse {
-  const n = req.pickups.length;
-  // $10,000 base + $4,000 por pickup, en centavos
-  const grossCents = 1_000_000 + 400_000 * n;
-  const discountPct = Math.min(0.05 * (n - 1), 0.2);
-  const totalNetCents = Math.round(grossCents * (1 - discountPct));
-
-  return {
-    origins_count: n,
-    discount_pct: discountPct,
-    total_gross_cents: grossCents,
-    total_net_cents: totalNetCents,
-    currency: "ARS",
-  };
+  const response = await client.get<{ data: Shipment[]; pagination: unknown }>(
+    "/api/v1/shipments",
+    { params: { orderId } },
+  );
+  return response.data.data;
 }
