@@ -133,6 +133,28 @@ export function useProduct(productId: string) {
   });
 }
 
+// ─── Códigos postales (público) ──────────────────────────────────────────────
+
+export type PostalCodeEntry = {
+  cp: string;
+  lat: number;
+  lng: number;
+  city: string;
+  province: string;
+};
+
+export function usePostalCodes() {
+  return useQuery<PostalCodeEntry[]>({
+    queryKey: ["postal-codes"],
+    queryFn: async () => {
+      const { data } = await api.get<{ data: PostalCodeEntry[]; total: number }>("/v1/postal-codes");
+      return data.data;
+    },
+    staleTime: 60 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+  });
+}
+
 // ─── Shipping preview ─────────────────────────────────────────────────────────
 
 export function useShippingPreview(addressId: string | undefined) {

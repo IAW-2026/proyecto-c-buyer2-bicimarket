@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { z } from "zod";
+import axios from "axios";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateBuyerProfile, groupItemsBySeller } from "@/lib/buyer-service";
 import { createPayment } from "@/lib/payments-api";
@@ -93,19 +94,39 @@ export async function POST(request: NextRequest) {
     ),
   }));
 
-  const quoteResponse = await getShippingQuotes({
-    pickups: groupedData.map((g) => ({
-      seller_profile_id: g.sellerProfileId,
-      packages: [{ weight_grams: g.weightGramsTotal, ...DEFAULT_PACKAGE_DIMS }],
-    })),
-    to: {
-      city: address.city,
-      province: address.province,
-      postal_code: address.postalCode,
-      country: address.country ?? "AR",
-    },
-    service_level: "standard",
-  });
+  let quoteResponse;
+  try {
+    quoteResponse = await getShippingQuotes({
+      pickups: groupedData.map((g) => ({
+        seller_profile_id: g.sellerProfileId,
+        packages: [{ weight_grams: g.weightGramsTotal, ...DEFAULT_PACKAGE_DIMS }],
+      })),
+      to: {
+        city: address.city,
+        province: address.province,
+        postal_code: address.postalCode,
+        country: address.country ?? "AR",
+      },
+      service_level: "standard",
+    });
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response) {
+      return NextResponse.json(
+        {
+          error: {
+            code: "UPSTREAM_ERROR",
+            message: "Error al cotizar el envío. Por favor, intentá de nuevo.",
+            details: (error.response.data as { error?: unknown })?.error ?? {},
+          },
+        },
+        { status: 502 },
+      );
+    }
+    return NextResponse.json(
+      { error: { code: "INTERNAL", message: "Error interno del servidor", details: {} } },
+      { status: 500 },
+    );
+  }
 
   const shippingTotalCents = quoteResponse.total_net_cents;
 
