@@ -153,6 +153,8 @@ model OrderSellerGroup {
   shippingCostCents  Int
   shippingQuoteId    String?
   shipmentId         String?
+  trackingNumber     String?
+  trackingUrl        String?
   weightGramsTotal   Int
   status             SellerGroupStatus @default(PENDING)
   shippingStatus     ShippingStatus?

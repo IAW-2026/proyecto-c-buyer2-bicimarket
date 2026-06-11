@@ -122,6 +122,8 @@ export type OrderSellerGroup = {
   shippingCostCents: number;
   shippingQuoteId?: string | null;
   shipmentId?: string | null;
+  trackingNumber?: string | null;
+  trackingUrl?: string | null;
   weightGramsTotal: number;
   status: SellerGroupStatus;
   shippingStatus?: ShippingStatus | null;

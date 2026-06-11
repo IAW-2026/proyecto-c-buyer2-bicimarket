@@ -1,3 +1,4 @@
+import { ExternalLink } from "lucide-react";
 import { ProductImage } from "@/components/shared/product-image";
 import { PriceDisplay } from "@/components/shared/price-display";
 import { SellerGroupStatusBadge } from "@/components/shared/status-badge";
@@ -6,7 +7,6 @@ import type { OrderSellerGroup, OrderItem } from "@/types/buyer";
 type SellerGroupSectionProps = {
   group: OrderSellerGroup;
   items: OrderItem[];
-  trackingNumber?: string;
 };
 
 export function SellerGroupSection({ group, items }: SellerGroupSectionProps) {
@@ -34,6 +34,25 @@ export function SellerGroupSection({ group, items }: SellerGroupSectionProps) {
         ))}
       </div>
 
+      {group.trackingNumber && (
+        <div className="border-t border-border/60 px-4 py-3 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs text-muted-foreground">Código de seguimiento</p>
+            <p className="text-sm font-mono font-medium">{group.trackingNumber}</p>
+          </div>
+          {group.trackingUrl && (
+            <a
+              href={group.trackingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-xs font-medium text-primary hover:underline shrink-0"
+            >
+              Rastrear envío
+              <ExternalLink className="size-3" />
+            </a>
+          )}
+        </div>
+      )}
     </div>
   );
 }

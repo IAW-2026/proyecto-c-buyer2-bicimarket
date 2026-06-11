@@ -86,6 +86,8 @@ export async function PATCH(
       status: newStatus,
       ...(newShippingStatus ? { shippingStatus: newShippingStatus } : {}),
       ...(parsed.data.shipment_id ? { shipmentId: parsed.data.shipment_id } : {}),
+      ...(parsed.data.tracking_number ? { trackingNumber: parsed.data.tracking_number } : {}),
+      ...(parsed.data.tracking_url ? { trackingUrl: parsed.data.tracking_url } : {}),
     },
   });
 
