@@ -91,11 +91,15 @@ export async function PATCH(
     },
   });
 
-  // Actualizar estado de la Order según el progreso de todos los grupos
-  const allGroups = await prisma.orderSellerGroup.findMany({
-    where: { orderId },
+  // Actualizar estado de la Order según el progreso de todos los grupos.
+  // Excluimos el grupo recién actualizado del query para evitar leer su estado viejo
+  // (stale read en PgBouncer u otros connection pools), y usamos newStatus directamente.
+  const otherGroups = await prisma.orderSellerGroup.findMany({
+    where: { orderId, id: { not: groupId } },
     select: { status: true },
   });
+
+  const allGroupStatuses = [...otherGroups.map((g) => g.status), newStatus];
 
   const ADVANCED_STATUSES = new Set<SellerGroupStatus>([
     SellerGroupStatus.IN_TRANSIT,
@@ -103,9 +107,9 @@ export async function PATCH(
     SellerGroupStatus.SETTLED,
   ]);
 
-  const allInTransitOrMore = allGroups.every((g) => ADVANCED_STATUSES.has(g.status));
-  const allDelivered = allGroups.every(
-    (g) => g.status === SellerGroupStatus.DELIVERED || g.status === SellerGroupStatus.SETTLED,
+  const allInTransitOrMore = allGroupStatuses.every((s) => ADVANCED_STATUSES.has(s));
+  const allDelivered = allGroupStatuses.every(
+    (s) => s === SellerGroupStatus.DELIVERED || s === SellerGroupStatus.SETTLED,
   );
 
   let newOrderStatus: OrderStatus | null = null;
