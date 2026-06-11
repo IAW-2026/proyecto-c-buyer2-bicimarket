@@ -1,0 +1,201 @@
+// ============================================================
+// Tipos para la comunicación entre apps del sistema BiciMarket
+//
+// Estos tipos representan los contratos de las APIs de otras
+// apps (Seller, Shipping, Payments) tal como están definidos
+// en documentacion/03-apis.md
+// ============================================================
+
+// ------------------------------------------------------------
+// Seller App — /api/v1/products
+// ------------------------------------------------------------
+
+export type SellerProduct = {
+  id: string;
+  title: string;
+  description?: string;
+  brand?: string;
+  model?: string;
+  price_cents: number;
+  currency?: string;
+  weight_grams: number;
+  dimensions_cm?: { length: number; width: number; height: number };
+  seller_profile_id: string;
+  seller_display_name?: string;
+  seller_name?: string;
+  main_image_url: string | null;
+  status: "active" | "draft" | "inactive";
+  category: "mtb" | "road" | "urban" | "kids" | "bmx" | "parts" | "accessories" | "indumentaria";
+  created_at: string;
+  updated_at?: string;
+};
+
+export type SellerProductsParams = {
+  page?: number;
+  limit?: number;
+  sort?: string;
+  q?: string;
+  status?: "active";
+};
+
+// GET /api/v1/products/{id}/availability
+export type ProductAvailability = {
+  product_id: string;
+  status: "active";
+  price_cents: number;
+  weight_grams: number;
+  seller_profile_id: string;
+  seller_name: string;
+};
+
+// ------------------------------------------------------------
+// Shipping App — /api/v1/shipping-quotes
+// ------------------------------------------------------------
+
+export type ShippingPackage = {
+  weight_grams: number;
+  length_cm: number;
+  width_cm: number;
+  height_cm: number;
+};
+
+export type ShippingPickup = {
+  seller_profile_id: string;
+  packages: ShippingPackage[];
+};
+
+export type ShippingDestination = {
+  city: string;
+  province: string;
+  postal_code: string;
+  country: string;
+};
+
+export type ServiceLevel = "standard" | "express" | "same_day";
+
+// POST /api/v1/shipping-quotes — un request con N orígenes (uno por vendedor)
+export type ShippingQuoteRequest = {
+  pickups: ShippingPickup[];
+  to: ShippingDestination;
+  service_level: ServiceLevel;
+};
+
+// POST /api/v1/shipping-quotes — cotización individual por vendedor
+export type ShippingQuote = {
+  id: string;
+  seller_profile_id: string;
+  service_level: ServiceLevel;
+  carrier: string;
+  cost_cents: number;
+  currency: string;
+  estimated_days_min: number;
+  estimated_days_max: number;
+  weight_grams_total: number;
+  packages_count: number;
+  expires_at: string;
+};
+
+// POST /api/v1/shipping-quotes — response
+export type ShippingQuoteResponse = {
+  quotes: ShippingQuote[];    // una cotización por vendedor (seller_profile_id)
+  origins_count: number;
+  discount_pct: number;       // 5% por origen extra, tope 20%
+  total_gross_cents: number;
+  total_net_cents: number;    // lo que se cobra al comprador (con descuento)
+  currency: string;
+};
+
+// GET /api/v1/quote-preview — response (sin persistencia, para preview en carrito)
+export type ShippingQuotePreview = {
+  cost_cents: number;
+  currency: string;
+  carrier: string;
+  service_level: ServiceLevel;
+  distance_km: number;
+  weight_grams_total: number;
+  estimated_days_min: number;
+  estimated_days_max: number;
+};
+
+// GET /api/v1/shipments?orderId=X
+export type Shipment = {
+  id: string;
+  order_id: string;
+  seller_profile_id: string;
+  tracking_number: string;
+  tracking_url: string | null;
+  status: string;
+  estimated_delivery: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// ------------------------------------------------------------
+// Payments App — /api/v1/payments
+// ------------------------------------------------------------
+
+export type CreatePaymentPayload = {
+  order_id: string;
+  buyer_clerk_user_id: string;
+  buyer_profile_id: string;
+  buyer_email: string;
+  amount_cents: number;
+  currency: "ARS";
+  items_summary: Array<{
+    seller_profile_id: string;
+    subtotal_cents: number;
+    shipping_cost_cents: number;
+    order_seller_group_id: string;
+    items: Array<{
+      product_id: string;
+      product_name_snapshot: string;
+      unit_price_cents: number;
+      quantity: number;
+    }>;
+  }>;
+  return_urls?: { success: string; failure: string; pending: string };
+  idempotency_key: string;
+};
+
+// POST /api/v1/payments → response (envelope desenvuelto por payments-api.ts)
+export type PaymentSessionResult = {
+  payment_id: string;
+  checkout_url: string;
+  preference_id: string;
+};
+
+// GET /api/v1/receipts/{paymentId}
+export type PaymentReceipt = {
+  payment_id: string;
+  order_id: string;
+  status: "pending" | "approved" | "rejected" | "refunded";
+  amount_cents: number;
+  currency: "ARS";
+  created_at: string;
+  updated_at: string;
+};
+
+// ------------------------------------------------------------
+// Payloads ENTRANTES — otras apps llaman a Buyer App
+// ------------------------------------------------------------
+
+// PATCH /api/v1/orders/{orderId}/status
+// Payments App → Buyer App (cuando cambia el estado de pago)
+export type IncomingOrderStatusPatch = {
+  status:
+    | "paid"
+    | "payment_failed"
+    | "cancelled"
+    | "refunded";
+  payment_id?: string;
+};
+
+// PATCH /api/v1/orders/{orderId}/seller-groups/{groupId}/shipping
+// Shipping App → Buyer App (cuando cambia el estado del envío)
+export type IncomingSellerGroupShippingPatch = {
+  status: "preparing" | "ready_to_ship" | "in_transit" | "delivered";
+  shipping_status?: "created" | "ready_for_pickup" | "picked_up" | "in_transit" | "out_for_delivery" | "delivered" | "failed_delivery" | "returned";
+  shipment_id?: string;
+  tracking_number?: string;
+  tracking_url?: string;
+};

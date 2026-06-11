@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum CartStatus {
+  ACTIVE
+  CONVERTED
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  PREPARING
+  PAYMENT_FAILED
+  PARTIALLY_SHIPPED
+  SHIPPED
+  DELIVERED
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum SellerGroupStatus {
+  PENDING
+  PREPARING
+  READY_TO_SHIP
+  IN_TRANSIT
+  DELIVERED
+  SETTLED
+  CANCELLED
+  REFUNDED
+}
+
+enum ShippingStatus {
+  CREATED
+  READY_FOR_PICKUP
+  PICKED_UP
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  FAILED_DELIVERY
+  RETURNED
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model BuyerProfile {
+  id                       String    @id
+  clerkUserId              String    @unique
+  fullName                 String
+  email                    String    @unique
+  phone                    String?
+  defaultShippingAddressId String?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  deletedAt                DateTime?
+
+  defaultShippingAddress Address?       @relation("DefaultShippingAddress", fields: [defaultShippingAddressId], references: [id], onDelete: SetNull)
+  addresses              Address[]      @relation("OwnedAddresses")
+  cart                   Cart?
+  favoriteItems          FavoriteItem[]
+  orders                 Order[]
+}
+
+model Address {
+  id             String   @id
+  buyerProfileId String
+  alias          String
+  street         String
+  number         String
+  apartment      String?
+  city           String
+  province       String
+  postalCode     String
+  country        String
+  isDefault      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  buyerProfile      BuyerProfile   @relation("OwnedAddresses", fields: [buyerProfileId], references: [id], onDelete: Cascade)
+  defaultForProfile BuyerProfile[] @relation("DefaultShippingAddress")
+}
+
+model Cart {
+  id             String     @id
+  buyerProfileId String     @unique
+  status         CartStatus @default(ACTIVE)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  buyerProfile BuyerProfile @relation(fields: [buyerProfileId], references: [id])
+  items        CartItem[]
+}
+
+model CartItem {
+  id              String   @id
+  cartId          String
+  productId       String
+  sellerProfileId String
+  quantity        Int      @default(1)
+  addedAt         DateTime @default(now())
+
+  cart Cart @relation(fields: [cartId], references: [id])
+
+  @@unique([cartId, productId])
+}
+
+model FavoriteItem {
+  id             String   @id
+  buyerProfileId String
+  productId      String
+  addedAt        DateTime @default(now())
+
+  buyerProfile BuyerProfile @relation(fields: [buyerProfileId], references: [id])
+
+  @@unique([buyerProfileId, productId])
+}
+
+model Order {
+  id                      String      @id
+  buyerProfileId          String
+  paymentId               String?
+  status                  OrderStatus @default(PENDING_PAYMENT)
+  itemsTotalCents         Int
+  shippingTotalCents      Int
+  totalCents              Int
+  currency                String      @default("ARS")
+  shippingAddressSnapshot Json
+  notes                   String?
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  buyerProfile  BuyerProfile         @relation(fields: [buyerProfileId], references: [id])
+  sellerGroups  OrderSellerGroup[]
+  items         OrderItem[]
+  statusHistory OrderStatusHistory[]
+}
+
+model OrderSellerGroup {
+  id                 String            @id
+  orderId            String
+  sellerProfileId    String
+  itemsSubtotalCents Int
+  shippingCostCents  Int
+  shippingQuoteId    String?
+  shipmentId         String?
+  trackingNumber     String?
+  trackingUrl        String?
+  weightGramsTotal   Int
+  status             SellerGroupStatus @default(PENDING)
+  shippingStatus     ShippingStatus?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  order      Order       @relation(fields: [orderId], references: [id])
+  orderItems OrderItem[]
+
+  @@unique([orderId, sellerProfileId])
+}
+
+model OrderItem {
+  id                  String   @id
+  orderId             String
+  sellerGroupId       String
+  productId           String
+  productNameSnapshot String
+  unitPriceCents      Int
+  quantity            Int
+  weightGramsSnapshot Int
+
+  order       Order            @relation(fields: [orderId], references: [id])
+  sellerGroup OrderSellerGroup @relation(fields: [sellerGroupId], references: [id])
+}
+
+model OrderStatusHistory {
+  id         String   @id
+  orderId    String
+  fromStatus String
+  toStatus   String
+  source     String
+  payload    Json?
+  occurredAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id])
+}

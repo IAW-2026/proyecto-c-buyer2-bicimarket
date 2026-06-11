@@ -1,0 +1,319 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { OrderStatus, SellerGroupStatus, ShippingStatus } from "@/generated/prisma/client";
+
+const SELLER_GROUP_STATUS_LABELS: Record<SellerGroupStatus, string> = {
+  PENDING: "Pendiente",
+  PREPARING: "Preparando",
+  READY_TO_SHIP: "Listo para enviar",
+  IN_TRANSIT: "En camino",
+  DELIVERED: "Entregado",
+  SETTLED: "Liquidado",
+  CANCELLED: "Cancelado",
+  REFUNDED: "Reembolsado",
+};
+
+const STATUS_LABELS: Record<OrderStatus, string> = {
+  PENDING_PAYMENT: "Pago pendiente",
+  PAID: "Pagado",
+  PREPARING: "En preparación",
+  PAYMENT_FAILED: "Pago fallido",
+  PARTIALLY_SHIPPED: "Enviado parcial",
+  SHIPPED: "Enviado",
+  DELIVERED: "Entregado",
+  COMPLETED: "Completado",
+  CANCELLED: "Cancelado",
+  REFUNDED: "Reembolsado",
+};
+
+type OrderDetail = {
+  id: string;
+  status: OrderStatus;
+  itemsTotalCents: number;
+  shippingTotalCents: number;
+  totalCents: number;
+  currency: string;
+  notes: string | null;
+  createdAt: string;
+  shippingAddressSnapshot: Record<string, string>;
+  buyerProfile: { id: string; fullName: string; email: string; phone: string | null };
+  sellerGroups: Array<{
+    id: string;
+    sellerProfileId: string;
+    status: SellerGroupStatus;
+    shippingStatus: ShippingStatus | null;
+    itemsSubtotalCents: number;
+    shippingCostCents: number;
+    orderItems: Array<{
+      id: string;
+      productId: string;
+      productNameSnapshot: string;
+      unitPriceCents: number;
+      quantity: number;
+    }>;
+  }>;
+  statusHistory: Array<{
+    id: string;
+    fromStatus: string;
+    toStatus: string;
+    source: string;
+    occurredAt: string;
+  }>;
+};
+
+const ORDER_STATUS_CLASS: Record<OrderStatus, string> = {
+  PENDING_PAYMENT: "bg-amber-100 text-amber-700 border-amber-200",
+  PAID: "bg-green-100 text-green-700 border-green-200",
+  PREPARING: "bg-blue-100 text-blue-700 border-blue-200",
+  PAYMENT_FAILED: "bg-red-100 text-red-700 border-red-200",
+  PARTIALLY_SHIPPED: "bg-blue-100 text-blue-700 border-blue-200",
+  SHIPPED: "bg-blue-100 text-blue-700 border-blue-200",
+  DELIVERED: "bg-green-100 text-green-700 border-green-200",
+  COMPLETED: "bg-green-100 text-green-700 border-green-200",
+  CANCELLED: "bg-red-100 text-red-700 border-red-200",
+  REFUNDED: "bg-orange-200 text-orange-900 border-orange-400",
+};
+
+const SELLER_ACCENT = [
+  "border-l-blue-400",
+  "border-l-emerald-400",
+  "border-l-violet-400",
+  "border-l-amber-400",
+];
+
+const fmt = (cents: number) =>
+  new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(cents / 100);
+
+export function OrderDetailView({ orderId }: { orderId: string }) {
+  const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [error, setError] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [groupUpdating, setGroupUpdating] = useState<Record<string, boolean>>({});
+  const [groupUpdateError, setGroupUpdateError] = useState<Record<string, string>>({});
+
+  function loadOrder() {
+    return fetch(`/api/admin/orders/${orderId}`)
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
+      .then(setOrder)
+      .catch(() => setError(true));
+  }
+
+  useEffect(() => {
+    loadOrder();
+  }, [orderId]);
+
+  async function handleGroupStatusChange(groupId: string, newStatus: string) {
+    setGroupUpdating((prev) => ({ ...prev, [groupId]: true }));
+    setGroupUpdateError((prev) => ({ ...prev, [groupId]: "" }));
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}/seller-groups/${groupId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) throw new Error();
+      await loadOrder();
+    } catch {
+      setGroupUpdateError((prev) => ({ ...prev, [groupId]: "No se pudo actualizar." }));
+    } finally {
+      setGroupUpdating((prev) => ({ ...prev, [groupId]: false }));
+    }
+  }
+
+  async function handleStatusChange(newStatus: string) {
+    if (!order || newStatus === order.status) return;
+    setUpdating(true);
+    setUpdateError(null);
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) throw new Error();
+      await loadOrder();
+    } catch {
+      setUpdateError("No se pudo actualizar el estado.");
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  if (error) return <p className="text-sm text-destructive">No se pudo cargar la orden.</p>;
+
+  if (!order) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-32 w-full rounded-xl" />
+        <Skeleton className="h-48 w-full rounded-xl" />
+        <Skeleton className="h-40 w-full rounded-xl" />
+      </div>
+    );
+  }
+
+  const addr = order.shippingAddressSnapshot as Record<string, string>;
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-mono text-muted-foreground">{order.id}</p>
+          <h2 className="font-heading text-xl font-bold">{order.buyerProfile.fullName}</h2>
+          <p className="text-sm text-muted-foreground">{order.buyerProfile.email}</p>
+        </div>
+        <Badge variant="outline" className={`w-fit ${ORDER_STATUS_CLASS[order.status]}`}>{STATUS_LABELS[order.status]}</Badge>
+      </div>
+
+      {/* Cambiar estado */}
+      <div className="rounded-xl border border-border/60 bg-card p-4 space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Cambiar estado
+        </p>
+        <div className="flex items-center gap-3 flex-wrap">
+          <select
+            value={order.status}
+            disabled={updating}
+            onChange={(e) => handleStatusChange(e.target.value)}
+            className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            {(Object.keys(STATUS_LABELS) as OrderStatus[]).map((s) => (
+              <option key={s} value={s}>
+                {STATUS_LABELS[s]}
+              </option>
+            ))}
+          </select>
+          {updating && <span className="text-xs text-muted-foreground">Actualizando…</span>}
+          {updateError && <span className="text-xs text-destructive">{updateError}</span>}
+        </div>
+      </div>
+
+      {/* Totales */}
+      <div className="grid gap-3 rounded-xl border border-border/60 bg-card p-4 sm:grid-cols-3">
+        <div>
+          <p className="text-xs text-muted-foreground">Subtotal items</p>
+          <p className="font-semibold">{fmt(order.itemsTotalCents)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Envío</p>
+          <p className="font-semibold">{fmt(order.shippingTotalCents)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Total</p>
+          <p className="font-heading text-lg font-bold">{fmt(order.totalCents)}</p>
+        </div>
+      </div>
+
+      {/* Dirección */}
+      <div className="rounded-xl border border-border/60 bg-card p-4">
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
+          Dirección de envío
+        </p>
+        <p className="text-sm">
+          {addr.street} {addr.number}{addr.apartment ? `, ${addr.apartment}` : ""},{" "}
+          {addr.city}, {addr.province} ({addr.postalCode}), {addr.country}
+        </p>
+      </div>
+
+      {/* Grupos por vendedor */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Items por vendedor
+          </p>
+          {order.sellerGroups.length > 1 && (
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+              {order.sellerGroups.length} vendedores
+            </span>
+          )}
+        </div>
+        {order.sellerGroups.map((group, index) => (
+          <div key={group.id} className={`rounded-xl border border-border/60 border-l-4 bg-card p-4 space-y-3 ${SELLER_ACCENT[index % SELLER_ACCENT.length]}`}>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[11px] font-bold text-muted-foreground shrink-0">
+                  {index + 1}
+                </span>
+                <div>
+                  <p className="text-xs font-semibold">Vendedor {index + 1}</p>
+                  <p className="text-[10px] font-mono text-muted-foreground break-all">{group.sellerProfileId}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <select
+                  value={group.status}
+                  disabled={!!groupUpdating[group.id]}
+                  onChange={(e) => handleGroupStatusChange(group.id, e.target.value)}
+                  className="rounded-lg border border-border bg-background px-2 py-1 text-xs disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  {(Object.keys(SELLER_GROUP_STATUS_LABELS) as SellerGroupStatus[]).map((s) => (
+                    <option key={s} value={s}>{SELLER_GROUP_STATUS_LABELS[s]}</option>
+                  ))}
+                </select>
+                {groupUpdating[group.id] && <span className="text-xs text-muted-foreground">Actualizando…</span>}
+                {groupUpdateError[group.id] && <span className="text-xs text-destructive">{groupUpdateError[group.id]}</span>}
+                {group.shippingStatus && (
+                  <Badge variant="secondary" className="text-[11px]">{group.shippingStatus}</Badge>
+                )}
+              </div>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-muted-foreground border-b border-border/40">
+                  <th className="pb-1 text-left font-medium">Producto</th>
+                  <th className="pb-1 text-right font-medium">Precio unit.</th>
+                  <th className="pb-1 text-right font-medium">Cant.</th>
+                  <th className="pb-1 text-right font-medium">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {group.orderItems.map((item) => (
+                  <tr key={item.id} className="border-b border-border/20 last:border-0">
+                    <td className="py-1.5">{item.productNameSnapshot}</td>
+                    <td className="py-1.5 text-right">{fmt(item.unitPriceCents)}</td>
+                    <td className="py-1.5 text-right">{item.quantity}</td>
+                    <td className="py-1.5 text-right font-medium">{fmt(item.unitPriceCents * item.quantity)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="flex justify-end gap-4 text-xs text-muted-foreground pt-1">
+              <span className="font-medium text-foreground">
+                Subtotal vendedor: {fmt(group.itemsSubtotalCents)}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Historial de estados */}
+      {order.statusHistory.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Historial de estados
+          </p>
+          <div className="rounded-xl border border-border/60 bg-card p-4 space-y-2">
+            {order.statusHistory.map((h) => (
+              <div key={h.id} className="flex items-center gap-3 text-sm">
+                <span className="text-[11px] text-muted-foreground w-32 shrink-0">
+                  {new Date(h.occurredAt).toLocaleString("es-AR")}
+                </span>
+                <span className="text-xs font-mono text-muted-foreground">{h.fromStatus}</span>
+                <span className="text-muted-foreground">→</span>
+                <span className="text-xs font-mono font-medium">{h.toStatus}</span>
+                <span className="text-[11px] text-muted-foreground ml-auto">{h.source}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
