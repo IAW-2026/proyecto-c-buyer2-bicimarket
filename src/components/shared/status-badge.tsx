@@ -15,6 +15,10 @@ const ORDER_STATUS_CONFIG: Record<OrderStatus, OrderStatusConfig> = {
     label: "Pagado",
     className: "bg-green-100 text-green-700 border-green-200",
   },
+  [OrderStatus.PREPARING]: {
+    label: "En preparación",
+    className: "bg-blue-100 text-blue-700 border-blue-200",
+  },
   [OrderStatus.PARTIALLY_SHIPPED]: {
     label: "Envío parcial",
     className: "bg-blue-100 text-blue-700 border-blue-200",

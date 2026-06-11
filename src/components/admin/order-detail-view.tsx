@@ -19,6 +19,7 @@ const SELLER_GROUP_STATUS_LABELS: Record<SellerGroupStatus, string> = {
 const STATUS_LABELS: Record<OrderStatus, string> = {
   PENDING_PAYMENT: "Pago pendiente",
   PAID: "Pagado",
+  PREPARING: "En preparación",
   PAYMENT_FAILED: "Pago fallido",
   PARTIALLY_SHIPPED: "Enviado parcial",
   SHIPPED: "Enviado",
@@ -66,6 +67,7 @@ type OrderDetail = {
 const ORDER_STATUS_CLASS: Record<OrderStatus, string> = {
   PENDING_PAYMENT: "bg-amber-100 text-amber-700 border-amber-200",
   PAID: "bg-green-100 text-green-700 border-green-200",
+  PREPARING: "bg-blue-100 text-blue-700 border-blue-200",
   PAYMENT_FAILED: "bg-red-100 text-red-700 border-red-200",
   PARTIALLY_SHIPPED: "bg-blue-100 text-blue-700 border-blue-200",
   SHIPPED: "bg-blue-100 text-blue-700 border-blue-200",

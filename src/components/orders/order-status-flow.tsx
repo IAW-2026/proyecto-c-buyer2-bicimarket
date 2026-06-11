@@ -20,7 +20,7 @@ import {
   CheckCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { OrderStatus, type OrderSellerGroup } from "@/types/buyer";
+import { OrderStatus, SellerGroupStatus, type OrderSellerGroup } from "@/types/buyer";
 
 type NodeState = "completed" | "current" | "upcoming" | "error";
 
@@ -41,6 +41,7 @@ const STEP_DEFS = [
 const STATUS_STEP: Partial<Record<OrderStatus, number>> = {
   [OrderStatus.PENDING_PAYMENT]: 0,
   [OrderStatus.PAID]: 2,
+  [OrderStatus.PREPARING]: 3,
   [OrderStatus.PARTIALLY_SHIPPED]: 3,
   [OrderStatus.SHIPPED]: 3,
   [OrderStatus.DELIVERED]: 4,
@@ -120,17 +121,32 @@ const nodeTypes: NodeTypes = { status: StatusNode };
 
 const X_STEP = 165;
 
+const PREPARING_GROUP_STATUSES = new Set<SellerGroupStatus>([
+  SellerGroupStatus.PREPARING,
+  SellerGroupStatus.READY_TO_SHIP,
+  SellerGroupStatus.IN_TRANSIT,
+  SellerGroupStatus.DELIVERED,
+  SellerGroupStatus.SETTLED,
+]);
+
 export function OrderStatusFlow({
   status,
-  sellerGroups: _sellerGroups,
+  sellerGroups,
 }: {
   status: OrderStatus;
   sellerGroups?: OrderSellerGroup[];
 }) {
   const baseStep = CANCELLED_SET.has(status) ? -1 : (STATUS_STEP[status] ?? 0);
-  const currentStep = baseStep;
-  const isCancelled = currentStep === -1;
+  const isCancelled = baseStep === -1;
   const isFinished = status === OrderStatus.DELIVERED || status === OrderStatus.COMPLETED;
+  const isInTransit = status === OrderStatus.PARTIALLY_SHIPPED || status === OrderStatus.SHIPPED;
+
+  // If any group is already preparing (regardless of Order.status), advance preparacion to completed
+  const anyGroupPreparing = sellerGroups?.some((g) => PREPARING_GROUP_STATUSES.has(g.status)) ?? false;
+  const effectiveStep = anyGroupPreparing && baseStep < 3 ? 3 : baseStep;
+
+  // "En camino" should only pulse when order is actually in transit, not just because a group is preparing
+  const currentIsUpcoming = effectiveStep === 3 && !isInTransit && !isCancelled;
 
   const nodes: Node[] = useMemo(
     () =>
@@ -138,9 +154,9 @@ export function OrderStatusFlow({
         let state: NodeState;
         if (isCancelled) {
           state = "error";
-        } else if (i < currentStep || (isFinished && i === currentStep)) {
+        } else if (i < effectiveStep || (isFinished && i === effectiveStep)) {
           state = "completed";
-        } else if (i === currentStep) {
+        } else if (i === effectiveStep && !currentIsUpcoming) {
           state = "current";
         } else {
           state = "upcoming";
@@ -154,14 +170,14 @@ export function OrderStatusFlow({
           draggable: false,
         };
       }),
-    [currentStep, isCancelled, isFinished],
+    [effectiveStep, isCancelled, isFinished, currentIsUpcoming],
   );
 
   const edges: Edge[] = useMemo(
     () =>
       STEP_DEFS.slice(0, -1).map((step, i) => {
-        const isActive = !isCancelled && i < currentStep;
-        const isAnimating = !isCancelled && i === currentStep - 1;
+        const isActive = !isCancelled && i < effectiveStep;
+        const isAnimating = !isCancelled && i === effectiveStep - 1;
         const isErrorEdge = isCancelled;
 
         return {
@@ -182,7 +198,7 @@ export function OrderStatusFlow({
           },
         };
       }),
-    [currentStep, isCancelled],
+    [effectiveStep, isCancelled, currentIsUpcoming],
   );
 
   return (

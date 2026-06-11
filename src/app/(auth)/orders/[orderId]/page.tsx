@@ -13,7 +13,7 @@ import { PriceDisplay } from "@/components/shared/price-display";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { OrderStatus } from "@/types/buyer";
+import { OrderStatus, SellerGroupStatus } from "@/types/buyer";
 
 type Props = {
   params: Promise<{ orderId: string }>;
@@ -48,6 +48,15 @@ export default function OrderDetailPage({ params }: Props) {
     );
   }
 
+  const anyGroupPreparing = order.sellerGroups.some((g) =>
+    g.status === SellerGroupStatus.PREPARING ||
+    g.status === SellerGroupStatus.READY_TO_SHIP
+  );
+  const displayStatus =
+    anyGroupPreparing && order.status === OrderStatus.PAID
+      ? OrderStatus.PREPARING
+      : order.status;
+
   const date = new Date(order.createdAt).toLocaleDateString("es-AR", {
     day: "numeric",
     month: "long",
@@ -68,7 +77,7 @@ export default function OrderDetailPage({ params }: Props) {
       <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Orden</div>
       <h1 className="font-heading mb-1 text-2xl font-bold tracking-tight">…{shortId}</h1>
       <div className="mb-6 flex items-center gap-2">
-        <OrderStatusBadge status={order.status} />
+        <OrderStatusBadge status={displayStatus} />
         <span className="text-xs text-muted-foreground">· {date}</span>
       </div>
 

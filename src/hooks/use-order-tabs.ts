@@ -16,7 +16,7 @@ const TABS: TabConfig[] = [
   {
     key: "pending",
     label: "Pendientes",
-    statuses: [OrderStatus.PENDING_PAYMENT, OrderStatus.PAID],
+    statuses: [OrderStatus.PENDING_PAYMENT, OrderStatus.PAID, OrderStatus.PREPARING],
   },
   {
     key: "in_transit",

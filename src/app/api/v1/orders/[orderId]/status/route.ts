@@ -55,6 +55,7 @@ export async function PATCH(
   const VALID_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
     PENDING_PAYMENT: ["PAID", "PAYMENT_FAILED", "CANCELLED"],
     PAID:            ["REFUNDED"],
+    PREPARING:       ["REFUNDED", "CANCELLED"],
     PARTIALLY_SHIPPED: ["REFUNDED"],
     SHIPPED:         ["REFUNDED"],
     DELIVERED:       ["REFUNDED"],

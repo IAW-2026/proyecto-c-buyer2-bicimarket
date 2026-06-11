@@ -5,7 +5,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { ProductImage } from "@/components/shared/product-image";
 import { OrderStatusBadge } from "@/components/shared/status-badge";
 import { PriceDisplay } from "@/components/shared/price-display";
-import type { Order } from "@/types/buyer";
+import { OrderStatus, SellerGroupStatus, type Order } from "@/types/buyer";
 
 type OrderCardProps = {
   order: Order;
@@ -18,6 +18,12 @@ export function OrderCard({ order }: OrderCardProps) {
     year: "numeric",
   });
 
+  const anyGroupPreparing = order.sellerGroups.some(
+    (g) => g.status === SellerGroupStatus.PREPARING || g.status === SellerGroupStatus.READY_TO_SHIP,
+  );
+  const displayStatus =
+    anyGroupPreparing && order.status === OrderStatus.PAID ? OrderStatus.PREPARING : order.status;
+
   const previewItems = order.items.slice(0, 3);
   const extraCount = order.items.length - previewItems.length;
 
@@ -27,7 +33,7 @@ export function OrderCard({ order }: OrderCardProps) {
         <div className="flex flex-col gap-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-semibold">…{order.id.slice(-8)}</span>
-            <OrderStatusBadge status={order.status} />
+            <OrderStatusBadge status={displayStatus} />
           </div>
           <p className="text-xs text-muted-foreground">
             {date} · {order.items.length} producto{order.items.length !== 1 ? "s" : ""}

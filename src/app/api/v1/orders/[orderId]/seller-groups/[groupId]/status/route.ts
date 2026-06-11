@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { SellerGroupStatus } from "@/generated/prisma";
+import { OrderStatus, SellerGroupStatus } from "@/generated/prisma";
 import { validateServiceToken } from "@/lib/service-auth";
 import { createOrderStatusHistoryId } from "@/lib/entity-ids";
 
@@ -63,12 +63,21 @@ export async function PATCH(
     );
   }
 
-  const [updated] = await Promise.all([
-    prisma.orderSellerGroup.update({
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) {
+    return NextResponse.json(
+      { error: { code: "ORDER_NOT_FOUND", message: "Orden no encontrada", details: {} } },
+      { status: 404 },
+    );
+  }
+
+  const updatedGroup = await prisma.$transaction(async (tx) => {
+    const grp = await tx.orderSellerGroup.update({
       where: { id: groupId },
       data: { status: SellerGroupStatus.PREPARING },
-    }),
-    prisma.orderStatusHistory.create({
+    });
+
+    await tx.orderStatusHistory.create({
       data: {
         id: createOrderStatusHistoryId(),
         orderId,
@@ -76,8 +85,27 @@ export async function PATCH(
         toStatus: SellerGroupStatus.PREPARING,
         source: "seller",
       },
-    }),
-  ]);
+    });
 
-  return NextResponse.json({ id: updated.id, status: updated.status });
+    if (order.status === OrderStatus.PAID) {
+      await tx.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.PREPARING },
+      });
+
+      await tx.orderStatusHistory.create({
+        data: {
+          id: createOrderStatusHistoryId(),
+          orderId,
+          fromStatus: OrderStatus.PAID,
+          toStatus: OrderStatus.PREPARING,
+          source: "seller",
+        },
+      });
+    }
+
+    return grp;
+  });
+
+  return NextResponse.json({ id: updatedGroup.id, status: updatedGroup.status });
 }

@@ -8,6 +8,7 @@ import type { OrderStatus } from "@/generated/prisma";
 const CANCELLABLE_STATUSES: OrderStatus[] = [
   "PENDING_PAYMENT",
   "PAID",
+  "PREPARING",
   "PAYMENT_FAILED",
 ];
 

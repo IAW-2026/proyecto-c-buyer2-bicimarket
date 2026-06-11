@@ -18,6 +18,7 @@ type BuyerRow = {
 const STATUS_LABELS: Record<OrderStatus, string> = {
   PENDING_PAYMENT: "Pago pendiente",
   PAID: "Pagado",
+  PREPARING: "En preparación",
   PAYMENT_FAILED: "Pago fallido",
   PARTIALLY_SHIPPED: "Enviado parcial",
   SHIPPED: "Enviado",

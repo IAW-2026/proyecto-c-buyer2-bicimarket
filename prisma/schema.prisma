@@ -19,6 +19,7 @@ enum CartStatus {
 enum OrderStatus {
   PENDING_PAYMENT
   PAID
+  PREPARING
   PAYMENT_FAILED
   PARTIALLY_SHIPPED
   SHIPPED
