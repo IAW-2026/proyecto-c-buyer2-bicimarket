@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
           sellerProfileId: g.sellerProfileId,
           itemsSubtotalCents: g.itemsSubtotalCents,
           shippingCostCents,
-          shippingQuoteId: quote?.id ?? null,
+          shippingQuoteId: quote?.id,
           weightGramsTotal: g.weightGramsTotal,
           status: "PENDING",
         },
@@ -205,6 +205,7 @@ export async function POST(request: NextRequest) {
 
   const itemsSummary = createdGroups.map((group, index) => ({
     seller_profile_id: groupedData[index].sellerProfileId,
+    shippingQuoteId: group.shippingQuoteId,
     subtotal_cents: groupedData[index].itemsSubtotalCents,
     shipping_cost_cents: group.shippingCostCents,
     order_seller_group_id: group.id,
