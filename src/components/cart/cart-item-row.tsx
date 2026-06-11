@@ -23,10 +23,10 @@ export function CartItemRow({
 }: CartItemRowProps) {
   return (
     <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-card px-4 py-3">
-      <ProductImage src={undefined} alt={item.productNameSnapshot} size="sm" />
+      <ProductImage src={item.imageUrl ?? undefined} alt={item.productName} size="sm" />
 
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold leading-tight">{item.productNameSnapshot}</p>
+        <p className="text-sm font-semibold leading-tight">{item.productName}</p>
         <p className="text-xs text-muted-foreground">
           <PriceDisplay amount={item.unitPriceCents} /> c/u
         </p>

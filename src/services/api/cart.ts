@@ -5,22 +5,14 @@ import type { CartItem } from "@/types/buyer";
 export type AddCartItemBody = {
   productId: string;
   sellerProfileId: string;
-  productNameSnapshot: string;
-  unitPriceCents: number;
   quantity: number;
-  weightGramsSnapshot: number;
-  currency?: string;
 };
 
 export async function addCartItem(payload: AddCartItemBody): Promise<CartItem> {
   const { data } = await api.post("/v1/buyer/cart", {
     product_id: payload.productId,
     seller_profile_id: payload.sellerProfileId,
-    product_name_snapshot: payload.productNameSnapshot,
-    unit_price_cents: payload.unitPriceCents,
     quantity: payload.quantity,
-    weight_grams_snapshot: payload.weightGramsSnapshot,
-    currency: payload.currency,
   });
   return deepToCamelCase<CartItem>(data);
 }

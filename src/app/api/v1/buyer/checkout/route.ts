@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { getOrCreateBuyerProfile, groupItemsBySeller } from "@/lib/buyer-service";
 import { createPayment } from "@/lib/payments-api";
 import { getShippingQuotes, DEFAULT_PACKAGE_DIMS } from "@/lib/shipping-api";
+import { getSellerProducts } from "@/lib/seller-api";
 import {
   createOrderId,
   createOrderSellerGroupId,
@@ -79,13 +80,26 @@ export async function POST(request: NextRequest) {
     country: address.country,
   };
 
-  const grouped = groupItemsBySeller(cart.items);
+  const { data: products } = await getSellerProducts();
+  const productMap = new Map(products.map((p) => [p.id, p]));
+
+  const enrichedItems = cart.items.map((item) => {
+    const product = productMap.get(item.productId);
+    return {
+      ...item,
+      productName: product?.title ?? "Producto no disponible",
+      unitPriceCents: product?.price_cents ?? 0,
+      weightGrams: product?.weight_grams ?? 0,
+    };
+  });
+
+  const grouped = groupItemsBySeller(enrichedItems);
 
   const groupedData = Object.entries(grouped).map(([sellerProfileId, items]) => ({
     sellerProfileId,
     items,
     weightGramsTotal: items.reduce(
-      (sum, i) => sum + i.weightGramsSnapshot * i.quantity,
+      (sum, i) => sum + i.weightGrams * i.quantity,
       0,
     ),
     itemsSubtotalCents: items.reduce(
@@ -147,7 +161,7 @@ export async function POST(request: NextRequest) {
       itemsTotalCents,
       shippingTotalCents,
       totalCents,
-      currency: cart.items[0]?.currency ?? "ARS",
+      currency: "ARS",
       shippingAddressSnapshot,
       notes: parsed.data.notes,
     },
@@ -181,10 +195,10 @@ export async function POST(request: NextRequest) {
       orderId: order.id,
       sellerGroupId: group.id,
       productId: item.productId,
-      productNameSnapshot: item.productNameSnapshot,
+      productNameSnapshot: item.productName,
       unitPriceCents: item.unitPriceCents,
       quantity: item.quantity,
-      weightGramsSnapshot: item.weightGramsSnapshot,
+      weightGramsSnapshot: item.weightGrams,
     })),
   );
 
@@ -211,7 +225,7 @@ const itemsSummary = createdGroups.map((group, index) => ({
   order_seller_group_id: group.id,
   items: groupedData[index].items.map((item) => ({
     product_id: item.productId,
-    product_name_snapshot: item.productNameSnapshot,
+    product_name_snapshot: item.productName,
     unit_price_cents: item.unitPriceCents,
     quantity: item.quantity,
   })),

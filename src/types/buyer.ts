@@ -51,12 +51,14 @@ export type CartItem = {
   cartId: string;
   productId: string;
   sellerProfileId: string;
-  productNameSnapshot: string;
+  quantity: number;
+  addedAt: string;
+  // Enriched at read time from live seller catalog
+  productName: string;
   unitPriceCents: number;
   currency: string;
-  quantity: number;
-  weightGramsSnapshot: number;
-  addedAt: string;
+  weightGrams: number;
+  imageUrl?: string | null;
 };
 
 export type Cart = {

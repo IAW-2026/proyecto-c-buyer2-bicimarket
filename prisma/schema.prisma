@@ -101,16 +101,12 @@ model Cart {
 }
 
 model CartItem {
-  id                  String   @id
-  cartId              String
-  productId           String
-  sellerProfileId     String
-  productNameSnapshot String
-  unitPriceCents      Int
-  currency            String   @default("ARS")
-  quantity            Int      @default(1)
-  weightGramsSnapshot Int
-  addedAt             DateTime @default(now())
+  id              String   @id
+  cartId          String
+  productId       String
+  sellerProfileId String
+  quantity        Int      @default(1)
+  addedAt         DateTime @default(now())
 
   cart Cart @relation(fields: [cartId], references: [id])
 

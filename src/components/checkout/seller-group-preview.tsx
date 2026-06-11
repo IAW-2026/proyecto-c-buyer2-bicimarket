@@ -25,9 +25,9 @@ export function SellerGroupPreview({ group }: SellerGroupPreviewProps) {
       <div className="divide-y divide-border/60">
         {group.items.map((item) => (
           <div key={item.id} className="flex items-center gap-3 px-4 py-3">
-            <ProductImage src={undefined} alt={item.productNameSnapshot} size="sm" />
+            <ProductImage src={item.imageUrl ?? undefined} alt={item.productName} size="sm" />
             <div className="flex-1 min-w-0">
-              <p className="truncate text-sm">{item.productNameSnapshot}</p>
+              <p className="truncate text-sm">{item.productName}</p>
               <p className="text-xs text-muted-foreground">
                 {item.quantity} × <PriceDisplay amount={item.unitPriceCents} />
               </p>

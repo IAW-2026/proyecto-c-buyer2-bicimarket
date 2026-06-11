@@ -129,10 +129,7 @@ export default function HomePage() {
     await addCartItem.mutateAsync({
       productId: product.id,
       sellerProfileId: product.sellerId ?? "unknown",
-      productNameSnapshot: product.title,
-      unitPriceCents: product.priceCents ?? 0,
       quantity: 1,
-      weightGramsSnapshot: product.weightGrams ?? 0,
     });
   }
 

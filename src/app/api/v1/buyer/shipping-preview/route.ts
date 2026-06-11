@@ -4,6 +4,7 @@ import axios from "axios";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateBuyerProfile, groupItemsBySeller } from "@/lib/buyer-service";
 import { getShippingQuotes, DEFAULT_PACKAGE_DIMS } from "@/lib/shipping-api";
+import { getSellerProducts } from "@/lib/seller-api";
 import type { ShippingQuoteResponse } from "@/types/inter-service";
 
 export async function GET(request: NextRequest) {
@@ -47,7 +48,15 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const grouped = groupItemsBySeller(cart.items);
+  const { data: products } = await getSellerProducts();
+  const productMap = new Map(products.map((p) => [p.id, p]));
+
+  const enrichedItems = cart.items.map((item) => ({
+    ...item,
+    weightGrams: productMap.get(item.productId)?.weight_grams ?? 0,
+  }));
+
+  const grouped = groupItemsBySeller(enrichedItems);
 
   try {
 
@@ -58,7 +67,7 @@ export async function GET(request: NextRequest) {
         seller_profile_id: sellerProfileId,
         packages: [
           {
-            weight_grams: items.reduce((sum, i) => sum + i.weightGramsSnapshot * i.quantity, 0),
+            weight_grams: items.reduce((sum, i) => sum + i.weightGrams * i.quantity, 0),
             ...DEFAULT_PACKAGE_DIMS,
           },
         ],
