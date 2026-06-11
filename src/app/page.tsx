@@ -243,7 +243,7 @@ function HeroSection({ productCount, sellerCount }: { productCount?: number; sel
             <ArrowRight className="size-4" />
           </Link>
           <a
-            href="https://proyecto-c-seller-pierinospina.vercel.app/"
+            href="https://proyecto-c-seller-bicimarket.vercel.app/"
             className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground transition-colors hover:text-primary"
           >
             Soy bicicletería
