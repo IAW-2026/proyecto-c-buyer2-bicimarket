@@ -203,19 +203,19 @@ export async function POST(request: NextRequest) {
     prisma.cart.update({ where: { id: cart.id }, data: { status: "CONVERTED" } }),
   ]);
 
-  const itemsSummary = createdGroups.map((group, index) => ({
-    seller_profile_id: groupedData[index].sellerProfileId,
-    shippingQuoteId: group.shippingQuoteId,
-    subtotal_cents: groupedData[index].itemsSubtotalCents,
-    shipping_cost_cents: group.shippingCostCents,
-    order_seller_group_id: group.id,
-    items: groupedData[index].items.map((item) => ({
-      product_id: item.productId,
-      product_name_snapshot: item.productNameSnapshot,
-      unit_price_cents: item.unitPriceCents,
-      quantity: item.quantity,
-    })),
-  }));
+const itemsSummary = createdGroups.map((group, index) => ({
+  seller_profile_id: groupedData[index].sellerProfileId,
+  shipping_quote_id: group.shippingQuoteId,
+  subtotal_cents: groupedData[index].itemsSubtotalCents,
+  shipping_cost_cents: group.shippingCostCents,
+  order_seller_group_id: group.id,
+  items: groupedData[index].items.map((item) => ({
+    product_id: item.productId,
+    product_name_snapshot: item.productNameSnapshot,
+    unit_price_cents: item.unitPriceCents,
+    quantity: item.quantity,
+  })),
+}));
 
   const baseReturnUrl = parsed.data.return_url;
   const payment = await createPayment({
