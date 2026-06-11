@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Store, ShoppingCart, Package } from "lucide-react";
+import { ChevronRight, Store, ShoppingCart, Package, UserCircle } from "lucide-react";
 import { useDashboardData } from "@/hooks/use-dashboard";
 
 type ActionItem = {
@@ -30,6 +30,12 @@ const actions: ActionItem[] = [
     description: (d) =>
       d.ordersTotal > 0 ? `${d.ordersTotal} pedido${d.ordersTotal !== 1 ? "s" : ""}` : "Sin pedidos aún",
   },
+  {
+    href: "/profile",
+    icon: UserCircle,
+    label: "Mi perfil",
+    description: "Ver y editar tu cuenta",
+  },
 ];
 
 export function QuickActions() {
@@ -38,7 +44,7 @@ export function QuickActions() {
   return (
     <div>
       <h2 className="mb-3 font-heading text-sm font-semibold">Acciones rápidas</h2>
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {actions.map((action) => {
           const Icon = action.icon;
           const description =

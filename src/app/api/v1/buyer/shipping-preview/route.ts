@@ -50,6 +50,9 @@ export async function GET(request: NextRequest) {
   const grouped = groupItemsBySeller(cart.items);
 
   try {
+
+    //console.log("Shipping quote response:", grouped);
+
     const quoteResponse = await getShippingQuotes({
       pickups: Object.entries(grouped).map(([sellerProfileId, items]) => ({
         seller_profile_id: sellerProfileId,
@@ -69,8 +72,8 @@ export async function GET(request: NextRequest) {
       service_level: "standard",
     });
 
-    console.log("Shipping quote response:", quoteResponse);
     
+
     return NextResponse.json(quoteResponse satisfies ShippingQuoteResponse);
   } catch (error) {
     if (axios.isAxiosError(error) && error.response) {

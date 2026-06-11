@@ -73,7 +73,8 @@ export function ShopHeader() {
     isShopRoute ||
     pathname === "/favorites" ||
     pathname === "/orders" ||
-    pathname === "/cart";
+    pathname === "/cart" ||
+    pathname === "/dashboard";
 
   const showCategories = pathname === "/" || pathname === "/shop";
 
