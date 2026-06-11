@@ -1,4 +1,3 @@
-import { SellerGroupStatusBadge } from "@/components/shared/status-badge";
 import { ProductImage } from "@/components/shared/product-image";
 import { PriceDisplay } from "@/components/shared/price-display";
 import type { OrderSellerGroup, OrderItem } from "@/types/buyer";
@@ -15,7 +14,6 @@ export function SellerGroupSection({ group, items }: SellerGroupSectionProps) {
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 bg-muted/20 px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-xs text-muted-foreground">Vendedor {group.sellerProfileId.slice(-6)}</span>
-          <SellerGroupStatusBadge status={group.status} />
         </div>
       </div>
 

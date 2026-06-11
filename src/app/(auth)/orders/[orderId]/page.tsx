@@ -2,15 +2,18 @@
 
 import { use } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { MapPin, CreditCard, Package } from "lucide-react";
 import { useBuyerOrder } from "@/hooks/use-buyer";
+import { usePayOrderMutation } from "@/hooks/querys/checkout/useCheckoutMutations";
 import { OrderStatusStepper } from "@/components/orders/order-status-stepper";
 import { SellerGroupSection } from "@/components/orders/seller-group-section";
 import { OrderStatusBadge } from "@/components/shared/status-badge";
 import { PriceDisplay } from "@/components/shared/price-display";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { OrderStatus } from "@/types/buyer";
 
 type Props = {
   params: Promise<{ orderId: string }>;
@@ -18,7 +21,17 @@ type Props = {
 
 export default function OrderDetailPage({ params }: Props) {
   const { orderId } = use(params);
+  const router = useRouter();
   const { data: order, isLoading, error } = useBuyerOrder(orderId);
+  const payOrder = usePayOrderMutation();
+
+  function handlePay() {
+    const returnUrl = `${window.location.origin}/orders`;
+    payOrder.mutate(
+      { orderId, returnUrl },
+      { onSuccess: ({ paymentUrl }) => router.push(paymentUrl) },
+    );
+  }
 
   if (isLoading) return <OrderDetailSkeleton />;
 
@@ -124,6 +137,18 @@ export default function OrderDetailPage({ params }: Props) {
               </div>
               <p className="text-xs text-muted-foreground">ID: {order.paymentId}</p>
             </div>
+          )}
+
+          {/* Pay now CTA */}
+          {order.status === OrderStatus.PENDING_PAYMENT && (
+            <Button
+              className="w-full"
+              onClick={handlePay}
+              disabled={payOrder.isPending}
+            >
+              <CreditCard className="size-4" />
+              Pagar ahora
+            </Button>
           )}
         </div>
       </div>
