@@ -20,7 +20,7 @@ import {
   CheckCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { OrderStatus, SellerGroupStatus, type OrderSellerGroup } from "@/types/buyer";
+import { OrderStatus, type OrderSellerGroup } from "@/types/buyer";
 
 type NodeState = "completed" | "current" | "upcoming" | "error";
 
@@ -120,21 +120,15 @@ const nodeTypes: NodeTypes = { status: StatusNode };
 
 const X_STEP = 165;
 
-const PREPARING_SET = new Set<SellerGroupStatus>([
-  SellerGroupStatus.PREPARING,
-  SellerGroupStatus.READY_TO_SHIP,
-]);
-
 export function OrderStatusFlow({
   status,
-  sellerGroups,
+  sellerGroups: _sellerGroups,
 }: {
   status: OrderStatus;
   sellerGroups?: OrderSellerGroup[];
 }) {
   const baseStep = CANCELLED_SET.has(status) ? -1 : (STATUS_STEP[status] ?? 0);
-  const anyPreparing = sellerGroups?.some((g) => PREPARING_SET.has(g.status)) ?? false;
-  const currentStep = baseStep === 2 && anyPreparing ? 3 : baseStep;
+  const currentStep = baseStep;
   const isCancelled = currentStep === -1;
   const isFinished = status === OrderStatus.DELIVERED || status === OrderStatus.COMPLETED;
 
